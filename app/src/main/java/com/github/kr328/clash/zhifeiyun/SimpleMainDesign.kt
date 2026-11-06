@@ -20,7 +20,7 @@ import kotlinx.coroutines.withContext
 
 /** Beginner-friendly home screen, built in code (no data binding). */
 class SimpleMainDesign(context: Context) : Design<SimpleMainDesign.Request>(context) {
-    enum class Request { Toggle, OpenNodes, Renew, Advanced, Logout, Refresh }
+    enum class Request { Toggle, OpenNodes, Renew, Advanced, Logout, Refresh, ModeRule, ModeGlobal, ModeApps, PickApps }
 
     enum class State { Disconnected, Connecting, Connected }
 
@@ -31,6 +31,10 @@ class SimpleMainDesign(context: Context) : Design<SimpleMainDesign.Request>(cont
     private val emailText: TextView
     private val remainText: TextView
     private val expireText: TextView
+    private val modeTabs = ArrayList<TextView>()
+    private val modeHint: TextView
+    private val appsEntry: LinearLayout
+    private val appsEntryText: TextView
 
     override val root: View
 
@@ -77,6 +81,45 @@ class SimpleMainDesign(context: Context) : Design<SimpleMainDesign.Request>(cont
         col.addView(statusText, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = c.dp(12) })
 
+        // Mode selector: 分流 / 全局 / 应用
+        val seg = LinearLayout(c).apply {
+            orientation = LinearLayout.HORIZONTAL
+            background = Ui.rounded(Color.WHITE, c.dp(22).toFloat(), 0xFFE1E7EF.toInt(), c.dp(1))
+            setPadding(c.dp(4), c.dp(4), c.dp(4), c.dp(4))
+            elevation = c.dp(1).toFloat()
+        }
+        listOf(
+            R.string.zfy_mode_rule to Request.ModeRule,
+            R.string.zfy_mode_global to Request.ModeGlobal,
+            R.string.zfy_mode_apps to Request.ModeApps,
+        ).forEach { (label, req) ->
+            val tab = c.text(c.getString(label), 15f, Ui.TEXT_SUB, true).apply {
+                gravity = Gravity.CENTER
+                setOnClickListener { requests.trySend(req) }
+            }
+            modeTabs.add(tab)
+            seg.addView(tab, LinearLayout.LayoutParams(0, c.dp(38), 1f))
+        }
+        col.addView(seg, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+            topMargin = c.dp(22); leftMargin = c.dp(12); rightMargin = c.dp(12)
+        })
+        modeHint = c.text("", 12f, Ui.TEXT_SUB).apply { gravity = Gravity.CENTER }
+        col.addView(modeHint, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = c.dp(8) })
+
+        appsEntry = card(c).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(c.dp(18), c.dp(12), c.dp(18), c.dp(12))
+            setOnClickListener { requests.trySend(Request.PickApps) }
+            visibility = View.GONE
+        }
+        appsEntryText = c.text("", 15f, Ui.TEXT, true)
+        appsEntry.addView(appsEntryText, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        appsEntry.addView(c.text("›", 20f, Ui.BLUE))
+        col.addView(appsEntry, cardParams(c, 12))
+
         // Node card
         val nodeCard = card(c).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -91,7 +134,7 @@ class SimpleMainDesign(context: Context) : Design<SimpleMainDesign.Request>(cont
         nodeCol.addView(nodeText)
         nodeCard.addView(nodeCol, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         nodeCard.addView(c.text(c.getString(R.string.zfy_switch_node), 14f, Ui.BLUE))
-        col.addView(nodeCard, cardParams(c, 28))
+        col.addView(nodeCard, cardParams(c, 16))
 
         // Account card
         val acct = card(c).apply { orientation = LinearLayout.VERTICAL }
@@ -137,7 +180,26 @@ class SimpleMainDesign(context: Context) : Design<SimpleMainDesign.Request>(cont
         }
 
         applyState(State.Disconnected)
+        applyMode(ProxyMode.Rule, 0)
     }
+
+    private fun applyMode(mode: ProxyMode, appCount: Int) {
+        val c = context
+        modeTabs.forEachIndexed { i, tab ->
+            val on = i == mode.ordinal
+            tab.background = if (on) Ui.rounded(Ui.BLUE, c.dp(19).toFloat()) else null
+            tab.setTextColor(if (on) Color.WHITE else Ui.TEXT_SUB)
+        }
+        modeHint.text = c.getString(when (mode) {
+            ProxyMode.Rule -> R.string.zfy_mode_rule_hint
+            ProxyMode.Global -> R.string.zfy_mode_global_hint
+            ProxyMode.Apps -> R.string.zfy_mode_apps_hint
+        })
+        appsEntry.visibility = if (mode == ProxyMode.Apps) View.VISIBLE else View.GONE
+        appsEntryText.text = c.getString(R.string.zfy_pick_apps_entry, appCount)
+    }
+
+    suspend fun setMode(mode: ProxyMode, appCount: Int) = withContext(Dispatchers.Main) { applyMode(mode, appCount) }
 
     private fun card(c: Context) = LinearLayout(c).apply {
         background = Ui.rounded(Color.WHITE, c.dp(16).toFloat())

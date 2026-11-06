@@ -12,6 +12,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import com.github.kr328.clash.core.model.Proxy
 import com.github.kr328.clash.core.model.ProxySort
+import com.github.kr328.clash.core.model.TunnelState
 import com.github.kr328.clash.util.startClashService
 import com.github.kr328.clash.util.stopClashService
 import com.github.kr328.clash.util.withClash
@@ -19,6 +20,8 @@ import com.github.kr328.clash.zhifeiyun.AccountStore
 import com.github.kr328.clash.zhifeiyun.PanelClient
 import com.github.kr328.clash.zhifeiyun.PanelConfig
 import com.github.kr328.clash.zhifeiyun.PanelParser
+import com.github.kr328.clash.zhifeiyun.ProxyMode
+import com.github.kr328.clash.zhifeiyun.ProxyModeManager
 import com.github.kr328.clash.zhifeiyun.SimpleMainDesign
 import com.github.kr328.clash.zhifeiyun.SubscriptionManager
 import com.github.kr328.clash.zhifeiyun.Ui
@@ -76,6 +79,11 @@ class MainActivity : BaseActivity<SimpleMainDesign>() {
                             startActivity(Intent(this@MainActivity, AdvancedActivity::class.java))
                         SimpleMainDesign.Request.Logout -> confirmLogout()
                         SimpleMainDesign.Request.Refresh -> manualRefresh(design)
+                        SimpleMainDesign.Request.ModeRule -> switchMode(design, ProxyMode.Rule)
+                        SimpleMainDesign.Request.ModeGlobal -> switchMode(design, ProxyMode.Global)
+                        SimpleMainDesign.Request.ModeApps -> switchMode(design, ProxyMode.Apps)
+                        SimpleMainDesign.Request.PickApps ->
+                            startActivity(Intent(this@MainActivity, AppPickerActivity::class.java))
                     }
                 }
             }
@@ -90,8 +98,37 @@ class MainActivity : BaseActivity<SimpleMainDesign>() {
                 else -> SimpleMainDesign.State.Disconnected
             }
         )
+        refreshMode(design)
         refreshAccount(design)
         refreshNode(design)
+    }
+
+    private suspend fun refreshMode(design: SimpleMainDesign) {
+        val mode = ProxyModeManager.current(this)
+        val count = withContext(Dispatchers.IO) { ProxyModeManager.selectedApps(this@MainActivity).size }
+        design.setMode(mode, count)
+    }
+
+    private suspend fun switchMode(design: SimpleMainDesign, mode: ProxyMode) {
+        if (mode == ProxyModeManager.current(this)) {
+            if (mode == ProxyMode.Apps) startActivity(Intent(this, AppPickerActivity::class.java))
+            return
+        }
+        val count = withContext(Dispatchers.IO) { ProxyModeManager.selectedApps(this@MainActivity).size }
+        design.setMode(mode, count)
+        val restart = ProxyModeManager.apply(this, mode)
+        if (mode == ProxyMode.Apps && count == 0) {
+            Toast.makeText(this, R.string.zfy_no_apps_selected, Toast.LENGTH_LONG).show()
+            startActivity(Intent(this, AppPickerActivity::class.java))
+        }
+        if (clashRunning && restart) {
+            Toast.makeText(this, R.string.zfy_reconnecting, Toast.LENGTH_SHORT).show()
+            connecting = true
+            design.setState(SimpleMainDesign.State.Connecting)
+            ProxyModeManager.restartVpn(this)
+            connecting = false
+        }
+        refreshAll(design)
     }
 
     private suspend fun refreshAccount(design: SimpleMainDesign) {
@@ -131,6 +168,19 @@ class MainActivity : BaseActivity<SimpleMainDesign>() {
                     g = withClash { queryProxyGroup(group, ProxySort.Default) }
                 }
                 store.autoNodeApplied = true
+            }
+
+            // 全局 mode: route GLOBAL through the main (auto/selected) group, not DIRECT.
+            if (ProxyModeManager.current(this) == ProxyMode.Global) {
+                runCatching {
+                    val mode = withClash { queryTunnelState().mode }
+                    if (mode == TunnelState.Mode.Global) {
+                        val global = withClash { queryProxyGroup("GLOBAL", ProxySort.Default) }
+                        if (global.now != group && global.proxies.any { it.name == group }) {
+                            withClash { patchSelector("GLOBAL", group) }
+                        }
+                    }
+                }
             }
 
             val now = g.proxies.firstOrNull { it.name == g.now }
@@ -227,6 +277,7 @@ class MainActivity : BaseActivity<SimpleMainDesign>() {
             Toast.makeText(this@MainActivity, R.string.zfy_sub_import_failed, Toast.LENGTH_LONG).show()
             return
         }
+        runCatching { ProxyModeManager.apply(this@MainActivity, ProxyModeManager.current(this@MainActivity)) }
         val vpnRequest = startClashService()
         try {
             if (vpnRequest != null) {

@@ -42,4 +42,19 @@
     <string name="zfy_testing">正在测速…</string>
     <string name="zfy_sub_import_failed">订阅导入失败，请点“刷新”或重新登录</string>
     <string name="zfy_vpn_failed">无法启动 VPN</string>
+    <string name="zfy_mode_rule">分流</string>
+    <string name="zfy_mode_global">全局</string>
+    <string name="zfy_mode_apps">应用</string>
+    <string name="zfy_mode_rule_hint">智能分流：国内直连，国外走代理</string>
+    <string name="zfy_mode_global_hint">全局代理：所有流量都走代理</string>
+    <string name="zfy_mode_apps_hint">分应用代理：仅所选应用走代理，其余应用直连</string>
+    <string name="zfy_pick_apps_entry">选择应用（%1$d 个）</string>
+    <string name="zfy_pick_apps_title">选择应用</string>
+    <string name="zfy_done">完成</string>
+    <string name="zfy_search_apps_hint">搜索应用名称、包名或拼音首字母</string>
+    <string name="zfy_show_system_apps">显示系统应用</string>
+    <string name="zfy_selected_count">已选 %1$d 个应用走代理</string>
+    <string name="zfy_no_apps_found">没有找到应用</string>
+    <string name="zfy_reconnecting">正在重新连接以应用设置…</string>
+    <string name="zfy_no_apps_selected">还没有选择应用，请先选择需要走代理的应用</string>
 </resources>

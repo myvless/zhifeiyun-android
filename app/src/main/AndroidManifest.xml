@@ -78,6 +78,12 @@
             android:label="@string/launch_name"
             android:windowSoftInputMode="adjustResize" />
         <activity
+            android:name=".AppPickerActivity"
+            android:configChanges="uiMode|orientation|screenSize"
+            android:exported="false"
+            android:label="@string/zfy_pick_apps_title"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
+        <activity
             android:name=".AdvancedActivity"
             android:configChanges="uiMode"
             android:exported="false"

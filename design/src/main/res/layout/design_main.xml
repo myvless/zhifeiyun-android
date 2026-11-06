@@ -63,11 +63,13 @@
                         android:layout_width="@dimen/large_item_header_layout_size"
                         android:layout_height="@dimen/large_item_header_layout_size">
 
-                        <View
+                        <ImageView
                             android:layout_width="@dimen/main_logo_size"
                             android:layout_height="@dimen/main_logo_size"
                             android:layout_gravity="center"
-                            android:background="@drawable/ic_clash" />
+                            android:contentDescription="@null"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/zfy_logo" />
                     </FrameLayout>
 
                     <TextView
@@ -114,7 +116,7 @@
                     android:layout_height="match_parent"
                     android:layout_marginVertical="@dimen/main_label_margin_vertical"
                     android:onClick="@{() -> self.request(Request.OpenProviders)}"
-                    android:visibility="@{clashRunning &amp;&amp; hasProviders ? View.VISIBLE : View.GONE}"
+                    android:visibility="gone"
                     app:icon="@drawable/ic_baseline_swap_vertical_circle"
                     app:text="@string/providers" />
 
@@ -123,6 +125,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginVertical="@dimen/main_label_margin_vertical"
                     android:onClick="@{() -> self.request(Request.OpenLogs)}"
+                    android:visibility="gone"
                     app:icon="@drawable/ic_baseline_assignment"
                     app:text="@string/logs" />
 
@@ -131,6 +134,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginVertical="@dimen/main_label_margin_vertical"
                     android:onClick="@{() -> self.request(Request.OpenSettings)}"
+                    android:visibility="gone"
                     app:icon="@drawable/ic_baseline_settings"
                     app:text="@string/settings" />
 
@@ -139,6 +143,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginVertical="@dimen/main_label_margin_vertical"
                     android:onClick="@{() -> self.request(Request.OpenHelp)}"
+                    android:visibility="gone"
                     app:icon="@drawable/ic_baseline_help_center"
                     app:text="@string/help" />
 
@@ -147,6 +152,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginVertical="@dimen/main_label_margin_vertical"
                     android:onClick="@{() -> self.request(Request.OpenAbout)}"
+                    android:visibility="gone"
                     app:icon="@drawable/ic_baseline_info"
                     app:text="@string/about" />
             </LinearLayout>
