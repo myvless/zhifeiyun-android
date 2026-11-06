@@ -67,7 +67,7 @@ class AppIconStrip(context: Context) : LinearLayout(context) {
                 gravity = Gravity.CENTER
                 minWidth = iconSize
                 setPadding(context.dp(3), 0, context.dp(3), 0)
-                background = Ui.rounded(0xFFEDF1F6.toInt(), iconSize / 2f)
+                background = Ui.rounded(Ui.SURFACE_ALT, iconSize / 2f)
             }, LayoutParams(LayoutParams.WRAP_CONTENT, iconSize).apply { if (showCount > 0) leftMargin = gap })
         }
     }

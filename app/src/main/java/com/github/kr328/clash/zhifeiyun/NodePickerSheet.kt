@@ -46,7 +46,7 @@ class NodePickerSheet(
         val root = LinearLayout(c).apply {
             orientation = LinearLayout.VERTICAL
             background = GradientDrawable().apply {
-                setColor(Color.WHITE)
+                setColor(Ui.SURFACE)
                 val r = c.dp(20).toFloat()
                 cornerRadii = floatArrayOf(r, r, r, r, 0f, 0f, 0f, 0f)
             }
@@ -54,7 +54,7 @@ class NodePickerSheet(
 
         // Drag handle
         root.addView(View(c).apply {
-            background = Ui.rounded(0xFFD5DCE5.toInt(), c.dp(2).toFloat())
+            background = Ui.rounded(Ui.HANDLE, c.dp(2).toFloat())
         }, LinearLayout.LayoutParams(c.dp(36), c.dp(4)).apply {
             gravity = Gravity.CENTER_HORIZONTAL; topMargin = c.dp(10)
         })
@@ -117,7 +117,7 @@ class NodePickerSheet(
         }
         val cancel = c.text(c.getString(android.R.string.cancel), 15f, Ui.TEXT_SUB, true).apply {
             gravity = Gravity.CENTER
-            background = Ui.rounded(0xFFEFF2F6.toInt(), c.dp(22).toFloat())
+            background = Ui.rounded(Ui.SURFACE_ALT, c.dp(22).toFloat())
             setOnClickListener { dialog.dismiss() }
         }
         val test = c.primaryButton(c.getString(R.string.zfy_speed_test))
@@ -179,7 +179,7 @@ class NodePickerSheet(
         val box = LinearLayout(c).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(c.dp(2), c.dp(2), c.dp(2), c.dp(2))
-            background = Ui.rounded(0xFFEFF2F6.toInt(), c.dp(14).toFloat())
+            background = Ui.rounded(Ui.SURFACE_ALT, c.dp(14).toFloat())
         }
         fun seg(label: String) = c.text(label, 12f, Ui.TEXT_SUB, true).apply {
             gravity = Gravity.CENTER
@@ -195,7 +195,7 @@ class NodePickerSheet(
         return t
     }
 
-    private fun divider() = View(c).apply { setBackgroundColor(0xFFEDF1F6.toInt()) }
+    private fun divider() = View(c).apply { setBackgroundColor(Ui.DIVIDER) }
         .also { it.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1) }
 
     private fun row(p: Proxy, selected: Boolean, onClick: () -> Unit): View {
@@ -204,7 +204,7 @@ class NodePickerSheet(
             gravity = Gravity.CENTER_VERTICAL
             setPadding(c.dp(20), c.dp(12), c.dp(20), c.dp(12))
             minimumHeight = c.dp(48)
-            if (selected) setBackgroundColor(0xFFEEF5FE.toInt())
+            if (selected) setBackgroundColor(Ui.SELECTED_ROW)
             isClickable = true
             setOnClickListener { onClick() }
         }
@@ -231,17 +231,17 @@ class NodePickerSheet(
             v.text = c.getString(R.string.zfy_delay_ms, delay)
             v.setTextColor(
                 when {
-                    delay <= 300 -> 0xFF22B573.toInt()
-                    delay <= 800 -> 0xFFF59E0B.toInt()
-                    else -> 0xFFEF4444.toInt()
+                    delay <= 300 -> Ui.GREEN
+                    delay <= 800 -> Ui.ORANGE
+                    else -> Ui.RED
                 }
             )
         } else if (tested) {
             v.text = c.getString(R.string.zfy_delay_timeout)
-            v.setTextColor(0xFFEF4444.toInt())
+            v.setTextColor(Ui.RED)
         } else {
             v.text = "-"
-            v.setTextColor(0xFFB0B8C4.toInt())
+            v.setTextColor(Ui.MUTED)
         }
     }
 
@@ -249,7 +249,7 @@ class NodePickerSheet(
         val ring = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
             setColor(Color.TRANSPARENT)
-            setStroke(c.dp(2), if (selected) Ui.BLUE else 0xFFC3CBD6.toInt())
+            setStroke(c.dp(2), if (selected) Ui.BLUE else Ui.RADIO_OFF)
         }
         if (!selected) return ring
         val dot = GradientDrawable().apply {

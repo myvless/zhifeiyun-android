@@ -103,4 +103,7 @@
     <string name="zfy_no_apps_found">没有找到应用</string>
     <string name="zfy_reconnecting">正在重新连接以应用设置…</string>
     <string name="zfy_no_apps_selected">还没有选择应用，请先选择需要走代理的应用</string>
+    <string name="zfy_theme_to_dark">切换到深色模式（长按：跟随系统）</string>
+    <string name="zfy_theme_to_light">切换到浅色模式（长按：跟随系统）</string>
+    <string name="zfy_theme_follow_system">已设为跟随系统深浅色</string>
 </resources>

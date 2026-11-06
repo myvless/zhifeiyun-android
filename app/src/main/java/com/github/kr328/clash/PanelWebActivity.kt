@@ -42,15 +42,11 @@ class PanelWebActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = Color.WHITE
-        if (android.os.Build.VERSION.SDK_INT >= 23) {
-            @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
-        }
+        Ui.applySystemBars(this, Ui.SURFACE)
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.WHITE)
+            setBackgroundColor(Ui.SURFACE)
             fitsSystemWindows = true
         }
         val bar = LinearLayout(this).apply {

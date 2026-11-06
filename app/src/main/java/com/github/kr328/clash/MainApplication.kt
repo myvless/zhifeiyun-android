@@ -29,6 +29,7 @@ class MainApplication : Application() {
         Log.d("Process $processName started")
 
         if (processName == packageName) {
+            com.github.kr328.clash.zhifeiyun.ThemeMode.init()
             Remote.launch()
         } else {
             sendServiceRecreated()

@@ -45,11 +45,7 @@ class LoginActivity : AppCompatActivity(), CoroutineScope by MainScope() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = Color.WHITE
-        if (android.os.Build.VERSION.SDK_INT >= 23) {
-            @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
-        }
+        Ui.applySystemBars(this, Ui.SURFACE)
         setContentView(buildView())
         AccountStore(this).email?.let { emailInput.setText(it) }
     }
@@ -114,7 +110,7 @@ class LoginActivity : AppCompatActivity(), CoroutineScope by MainScope() {
         })
 
         return ScrollView(this).apply {
-            setBackgroundColor(Color.WHITE)
+            setBackgroundColor(Ui.SURFACE)
             isFillViewport = true
             fitsSystemWindows = true
             addView(col)
@@ -125,10 +121,10 @@ class LoginActivity : AppCompatActivity(), CoroutineScope by MainScope() {
         this.hint = hint
         setSingleLine(true)
         setTextColor(Ui.TEXT)
-        setHintTextColor(Ui.TEXT_SUB)
+        setHintTextColor(Ui.TEXT_HINT)
         textSize = 16f
         setPadding(dp(16), 0, dp(16), 0)
-        background = Ui.rounded(Ui.GREY_BG, dp(12).toFloat())
+        background = Ui.rounded(Ui.INPUT_BG, dp(12).toFloat())
     }
 
     private fun fullWidth(height: Int) =

@@ -23,7 +23,7 @@ import kotlinx.coroutines.withContext
 
 /** Beginner-friendly home screen, built in code (no data binding). */
 class SimpleMainDesign(context: Context) : Design<SimpleMainDesign.Request>(context) {
-    enum class Request { Toggle, OpenNodes, Renew, Advanced, Logout, Refresh, ModeRule, ModeGlobal, TogglePerApp, PickApps }
+    enum class Request { Toggle, OpenNodes, Renew, Advanced, Logout, Refresh, ModeRule, ModeGlobal, TogglePerApp, PickApps, ToggleTheme, FollowSystemTheme }
 
     enum class State { Disconnected, Connecting, Connected }
 
@@ -64,6 +64,18 @@ class SimpleMainDesign(context: Context) : Design<SimpleMainDesign.Request>(cont
         }, LinearLayout.LayoutParams(c.dp(44), c.dp(44)))
         header.addView(c.text(c.getString(R.string.zfy_app_name), 22f, Ui.BLUE_DARK, true),
             LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { leftMargin = c.dp(6) })
+        // Light/dark toggle: shows the moon in light mode (tap → dark) and the sun in dark mode.
+        header.addView(ImageView(c).apply {
+            setImageResource(if (Ui.night) R.drawable.ic_zfy_sun else R.drawable.ic_zfy_moon)
+            imageTintList = ColorStateList.valueOf(if (Ui.night) 0xFFFFC94D.toInt() else Ui.BLUE_DARK)
+            background = Ui.rounded(Ui.SURFACE, c.dp(18).toFloat(), Ui.BORDER, c.dp(1))
+            setPadding(c.dp(8), c.dp(8), c.dp(8), c.dp(8))
+            contentDescription = c.getString(
+                if (Ui.night) R.string.zfy_theme_to_light else R.string.zfy_theme_to_dark
+            )
+            setOnClickListener { requests.trySend(Request.ToggleTheme) }
+            setOnLongClickListener { requests.trySend(Request.FollowSystemTheme); true }
+        }, LinearLayout.LayoutParams(c.dp(36), c.dp(36)).apply { leftMargin = c.dp(8) })
         header.addView(c.text(c.getString(R.string.zfy_advanced), 15f, Ui.BLUE).apply {
             setPadding(c.dp(12), c.dp(8), c.dp(4), c.dp(8))
             setOnClickListener { requests.trySend(Request.Advanced) }
@@ -93,7 +105,7 @@ class SimpleMainDesign(context: Context) : Design<SimpleMainDesign.Request>(cont
         // Mode selector: 分流 / 全局 (last choice is remembered and also used for per-app)
         val seg = LinearLayout(c).apply {
             orientation = LinearLayout.HORIZONTAL
-            background = Ui.rounded(Color.WHITE, c.dp(22).toFloat(), 0xFFE1E7EF.toInt(), c.dp(1))
+            background = Ui.rounded(Ui.SURFACE, c.dp(22).toFloat(), Ui.BORDER, c.dp(1))
             setPadding(c.dp(4), c.dp(4), c.dp(4), c.dp(4))
             elevation = c.dp(1).toFloat()
         }
@@ -136,11 +148,11 @@ class SimpleMainDesign(context: Context) : Design<SimpleMainDesign.Request>(cont
         perAppSwitch = SwitchCompat(c).apply {
             thumbTintList = ColorStateList(
                 arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-                intArrayOf(Ui.BLUE, 0xFFF5F7FA.toInt())
+                intArrayOf(Ui.BLUE, Ui.SWITCH_THUMB_OFF)
             )
             trackTintList = ColorStateList(
                 arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-                intArrayOf(0x661E7BEF, 0x33000000)
+                intArrayOf(0x661E7BEF, Ui.SWITCH_TRACK_OFF)
             )
             setOnCheckedChangeListener { _, _ ->
                 if (!bindingSwitch) requests.trySend(Request.TogglePerApp)
@@ -149,7 +161,7 @@ class SimpleMainDesign(context: Context) : Design<SimpleMainDesign.Request>(cont
         switchRow.addView(perAppSwitch)
         appsCard.addView(switchRow)
 
-        appsDivider = View(c).apply { setBackgroundColor(0xFFEDF1F6.toInt()) }
+        appsDivider = View(c).apply { setBackgroundColor(Ui.DIVIDER) }
         appsCard.addView(appsDivider, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1))
 
         appsEntry = LinearLayout(c).apply {
@@ -253,7 +265,7 @@ class SimpleMainDesign(context: Context) : Design<SimpleMainDesign.Request>(cont
         withContext(Dispatchers.Main) { applyMode(mode, perApp, icons) }
 
     private fun card(c: Context) = LinearLayout(c).apply {
-        background = Ui.rounded(Color.WHITE, c.dp(16).toFloat())
+        background = Ui.rounded(Ui.SURFACE, c.dp(16).toFloat())
         setPadding(c.dp(18), c.dp(16), c.dp(18), c.dp(16))
         elevation = c.dp(1).toFloat()
     }
@@ -266,7 +278,7 @@ class SimpleMainDesign(context: Context) : Design<SimpleMainDesign.Request>(cont
         val c = context
         val (color, label, status) = when (state) {
             State.Disconnected -> Triple(Ui.BLUE, R.string.zfy_connect, R.string.zfy_status_disconnected)
-            State.Connecting -> Triple(0xFF90A4AE.toInt(), R.string.zfy_connecting, R.string.zfy_status_connecting)
+            State.Connecting -> Triple(Ui.GREY_CONNECTING, R.string.zfy_connecting, R.string.zfy_status_connecting)
             State.Connected -> Triple(Ui.GREEN, R.string.zfy_disconnect, R.string.zfy_status_connected)
         }
         connectButton.background = GradientDrawable().apply {
@@ -275,7 +287,7 @@ class SimpleMainDesign(context: Context) : Design<SimpleMainDesign.Request>(cont
         }
         connectRing.background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
-            setColor((color and 0x00FFFFFF) or 0x33000000)
+            setColor((color and 0x00FFFFFF) or Ui.RING_ALPHA)
         }
         connectButton.text = c.getString(label)
         statusText.text = c.getString(status)

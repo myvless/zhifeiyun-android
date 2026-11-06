@@ -117,8 +117,8 @@ class AppPickerDesign(
             setSingleLine()
             textSize = 15f
             setTextColor(Ui.TEXT)
-            setHintTextColor(0xFF9AA5B1.toInt())
-            background = Ui.rounded(Color.WHITE, c.dp(22).toFloat(), 0xFFE1E7EF.toInt(), c.dp(1))
+            setHintTextColor(Ui.TEXT_HINT)
+            background = Ui.rounded(Ui.SURFACE, c.dp(22).toFloat(), Ui.BORDER, c.dp(1))
             setPadding(c.dp(16), 0, c.dp(16), 0)
             addTextChangedListener(object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, d: Int) = Unit
@@ -207,7 +207,7 @@ class AppPickerDesign(
         if (Build.VERSION.SDK_INT >= 21) {
             buttonTintList = ColorStateList(
                 arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-                intArrayOf(Ui.BLUE, 0xFFB0BAC5.toInt())
+                intArrayOf(Ui.BLUE, Ui.MUTED)
             )
         }
     }
@@ -339,7 +339,7 @@ class AppPickerDesign(
             val row = LinearLayout(c).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                background = Ui.rounded(Color.WHITE, c.dp(12).toFloat())
+                background = Ui.rounded(Ui.SURFACE, c.dp(12).toFloat())
                 setPadding(c.dp(12), c.dp(8), c.dp(6), c.dp(8))
             }
             val icon = ImageView(c).apply { scaleType = ImageView.ScaleType.FIT_CENTER }
@@ -348,7 +348,7 @@ class AppPickerDesign(
             val label = c.text("", 15f, Ui.TEXT).apply {
                 setSingleLine(); ellipsize = TextUtils.TruncateAt.END
             }
-            val pkg = c.text("", 11f, 0xFF9AA5B1.toInt()).apply {
+            val pkg = c.text("", 11f, Ui.TEXT_HINT).apply {
                 setSingleLine(); ellipsize = TextUtils.TruncateAt.MIDDLE
             }
             texts.addView(label); texts.addView(pkg)

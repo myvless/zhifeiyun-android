@@ -24,7 +24,10 @@ import com.github.kr328.clash.zhifeiyun.ProxyMode
 import com.github.kr328.clash.zhifeiyun.ProxyModeManager
 import com.github.kr328.clash.zhifeiyun.SimpleMainDesign
 import com.github.kr328.clash.zhifeiyun.SubscriptionManager
+import com.github.kr328.clash.zhifeiyun.ThemeMode
 import com.github.kr328.clash.zhifeiyun.Ui
+import com.github.kr328.clash.design.model.DarkMode
+import com.github.kr328.clash.util.ApplicationObserver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -84,6 +87,13 @@ class MainActivity : BaseActivity<SimpleMainDesign>() {
                         SimpleMainDesign.Request.TogglePerApp -> setPerApp(design, design.perAppChecked)
                         SimpleMainDesign.Request.PickApps ->
                             startActivity(Intent(this@MainActivity, AppPickerActivity::class.java))
+                        // UI only: recreates the screens, the VPN service keeps running untouched.
+                        SimpleMainDesign.Request.ToggleTheme ->
+                            ThemeMode.toggle(ApplicationObserver.createdActivities)
+                        SimpleMainDesign.Request.FollowSystemTheme -> {
+                            Toast.makeText(applicationContext, R.string.zfy_theme_follow_system, Toast.LENGTH_SHORT).show()
+                            ThemeMode.set(DarkMode.Auto, ApplicationObserver.createdActivities)
+                        }
                     }
                 }
             }

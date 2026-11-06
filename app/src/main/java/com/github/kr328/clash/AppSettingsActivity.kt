@@ -34,6 +34,8 @@ class AppSettingsActivity : BaseActivity<AppSettingsDesign>(), Behavior {
                     }
                 }
                 design.requests.onReceive {
+                    // 暗黑模式 may have changed here: keep the home toggle / AppCompat in sync.
+                    com.github.kr328.clash.zhifeiyun.ThemeMode.reload()
                     ApplicationObserver.createdActivities.forEach {
                         it.recreate()
                     }

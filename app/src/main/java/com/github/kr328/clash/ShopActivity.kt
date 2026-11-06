@@ -73,11 +73,7 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = Color.WHITE
-        if (android.os.Build.VERSION.SDK_INT >= 23) {
-            @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
-        }
+        Ui.applySystemBars(this, Ui.SURFACE)
         shop = ShopClient(this)
         setContentView(buildChrome())
         loadProducts()
@@ -102,7 +98,7 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
         val bar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setBackgroundColor(Color.WHITE)
+            setBackgroundColor(Ui.SURFACE)
             setPadding(dp(8), dp(4), dp(12), dp(4))
         }
         bar.addView(text("‹", 28f, Ui.BLUE).apply {
@@ -129,7 +125,7 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
 
         footer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.WHITE)
+            setBackgroundColor(Ui.SURFACE)
             setPadding(dp(16), dp(10), dp(16), dp(12))
             elevation = dp(4).toFloat()
             visibility = View.GONE
@@ -286,7 +282,7 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
             }
         } else {
             c.alpha = 0.5f
-            c.addView(text(getString(R.string.zfy_sold_out), 12f, 0xFFEF4444.toInt(), true).apply {
+            c.addView(text(getString(R.string.zfy_sold_out), 12f, Ui.RED, true).apply {
                 setPadding(0, dp(6), 0, 0)
             })
         }
@@ -329,9 +325,9 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
             setSingleLine(true)
             textSize = 15f
             setTextColor(Ui.TEXT)
-            setHintTextColor(0xFFAAB4C0.toInt())
+            setHintTextColor(Ui.TEXT_HINT)
             setPadding(dp(14), 0, dp(14), 0)
-            background = Ui.rounded(Ui.GREY_BG, dp(10).toFloat())
+            background = Ui.rounded(Ui.SURFACE_ALT, dp(10).toFloat())
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
         }
         val couponStatus = text("", 13f, Ui.TEXT_SUB).apply { visibility = View.GONE; setPadding(0, dp(6), 0, 0) }
@@ -363,7 +359,7 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
                 applyBtn.isEnabled = true
                 couponStatus.visibility = View.VISIBLE
                 couponStatus.text = r.message
-                couponStatus.setTextColor(if (r.ok) Ui.GREEN else 0xFFEF4444.toInt())
+                couponStatus.setTextColor(if (r.ok) Ui.GREEN else Ui.RED)
                 if (r.ok) {
                     discountRow.visibility = View.VISIBLE
                     (discountRow.getChildAt(1) as TextView).text = "-¥" + (r.discount ?: "0")
@@ -427,7 +423,7 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
         top.addView(text(getString(R.string.zfy_invoice_no, inv.id), 15f, Ui.TEXT_SUB),
             LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         inv.status?.let { s ->
-            top.addView(text(s, 12f, if (inv.unpaid) 0xFFF59E0B.toInt() else Ui.GREEN, true).apply {
+            top.addView(text(s, 12f, if (inv.unpaid) Ui.ORANGE else Ui.GREEN, true).apply {
                 setPadding(dp(10), dp(3), dp(10), dp(3))
                 background = Ui.rounded(if (inv.unpaid) 0x1FF59E0B else 0x1F22B573, dp(10).toFloat())
             })
@@ -471,7 +467,7 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
             val listCard = card().apply { setPadding(0, dp(4), 0, dp(4)) }
             val radios = ArrayList<Pair<ShopParser.PayOption, View>>()
             inv.options.forEachIndexed { i, o ->
-                if (i > 0) listCard.addView(View(this).apply { setBackgroundColor(0xFFEDF1F6.toInt()) },
+                if (i > 0) listCard.addView(View(this).apply { setBackgroundColor(Ui.DIVIDER) },
                     LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1).apply { leftMargin = dp(48) })
                 val row = LinearLayout(this).apply {
                     orientation = LinearLayout.HORIZONTAL
@@ -633,7 +629,7 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
 
     private fun card() = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
-        background = Ui.rounded(Color.WHITE, dp(14).toFloat())
+        background = Ui.rounded(Ui.SURFACE, dp(14).toFloat())
         setPadding(dp(18), dp(16), dp(18), dp(16))
         elevation = dp(1).toFloat()
     }
@@ -655,7 +651,7 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
         val ring = android.graphics.drawable.GradientDrawable().apply {
             shape = android.graphics.drawable.GradientDrawable.OVAL
             setColor(Color.TRANSPARENT)
-            setStroke(dp(2), if (on) Ui.BLUE else 0xFFC3CBD6.toInt())
+            setStroke(dp(2), if (on) Ui.BLUE else Ui.RADIO_OFF)
         }
         if (!on) return ring
         val dot = android.graphics.drawable.GradientDrawable().apply {
