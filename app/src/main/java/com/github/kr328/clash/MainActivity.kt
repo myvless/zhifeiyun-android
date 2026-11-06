@@ -169,13 +169,13 @@ class MainActivity : BaseActivity<SimpleMainDesign>() {
                 .setTitle(R.string.zfy_choose_node)
                 .setSingleChoiceItems(labels, checked) { d, which ->
                     d.dismiss()
-                    launch {
+                    this@MainActivity.launch {
                         withClash { patchSelector(group, names[which]) }
                         refreshNode(design)
                     }
                 }
                 .setNeutralButton(R.string.zfy_speed_test) { _, _ ->
-                    launch {
+                    this@MainActivity.launch {
                         Toast.makeText(this@MainActivity, R.string.zfy_testing, Toast.LENGTH_SHORT).show()
                         runCatching { withClash { healthCheck(group) } }
                         showNodes(design)
