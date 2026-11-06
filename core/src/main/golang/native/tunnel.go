@@ -74,6 +74,11 @@ func healthCheck(completable unsafe.Pointer, name C.c_string) {
 	}(C.GoString(name))
 }
 
+//export closeAllConnections
+func closeAllConnections() {
+	tunnel.CloseAllConnections()
+}
+
 //export healthCheckAll
 func healthCheckAll() {
 	tunnel.HealthCheckAll()

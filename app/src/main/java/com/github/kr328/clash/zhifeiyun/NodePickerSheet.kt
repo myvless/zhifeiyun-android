@@ -36,8 +36,11 @@ class NodePickerSheet(
     private val c = context
     private val delayViews = HashMap<String, TextView>()
     private var tested = false
+    private var sort = NodeSort.load(context)
+    private var current: List<Proxy> = emptyList()
 
     fun show(proxies: List<Proxy>, now: String) {
+        current = proxies
         val dialog = BottomSheetDialog(c)
 
         val root = LinearLayout(c).apply {
@@ -65,20 +68,30 @@ class NodePickerSheet(
         header.addView(c.text(c.getString(R.string.zfy_choose_node), 17f, Ui.TEXT, true),
             LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         header.addView(c.text(c.getString(R.string.zfy_node_count, proxies.size), 12f, Ui.TEXT_SUB))
+        val sortToggle = sortToggle()
+        header.addView(sortToggle.root, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { leftMargin = c.dp(10) })
         root.addView(header)
         root.addView(divider())
 
         // List
         val list = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL }
-        var selectedRow: View? = null
-        proxies.forEach { p ->
-            val row = row(p, p.name == now) {
-                dialog.dismiss()
-                if (p.name != now) onSelect(p.name)
+        val render: () -> View? = {
+            list.removeAllViews()
+            delayViews.clear()
+            var sel: View? = null
+            NodeSort.apply(current, sort).forEach { p ->
+                val row = row(p, p.name == now) {
+                    dialog.dismiss()
+                    if (p.name != now) onSelect(p.name)
+                }
+                if (p.name == now) sel = row
+                list.addView(row)
             }
-            if (p.name == now) selectedRow = row
-            list.addView(row)
+            sel
         }
+        val selectedRow: View? = render()
         val scroll = NestedScrollView(c).apply {
             isFillViewport = false
             addView(list)
@@ -86,6 +99,15 @@ class NodePickerSheet(
         val screenH = c.resources.displayMetrics.heightPixels
         val listH = if (proxies.size > 7) (screenH * 0.62f).toInt() else ViewGroup.LayoutParams.WRAP_CONTENT
         root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, listH))
+        sortToggle.onChange = { mode ->
+            if (mode != sort) {
+                sort = mode
+                NodeSort.save(c, mode)
+                sortToggle.bind(mode)
+                render()
+                scroll.scrollTo(0, 0)
+            }
+        }
         root.addView(divider())
 
         // Actions
@@ -105,8 +127,13 @@ class NodePickerSheet(
             scope.launch {
                 val updated = runCatching { onSpeedTest() }.getOrNull()
                 tested = true
-                updated?.forEach { p -> delayViews[p.name]?.let { bindDelay(it, p.delay) } }
-                    ?: delayViews.values.forEach { bindDelay(it, -1) }
+                if (updated != null && updated.isNotEmpty()) {
+                    current = updated
+                    render() // re-sort with the fresh latencies
+                    scroll.scrollTo(0, 0)
+                } else {
+                    delayViews.values.forEach { bindDelay(it, -1) }
+                }
                 test.isEnabled = true
                 test.text = c.getString(R.string.zfy_speed_test)
             }
@@ -134,6 +161,38 @@ class NodePickerSheet(
             selectedRow?.let { r -> scroll.post { scroll.scrollTo(0, (r.top - c.dp(96)).coerceAtLeast(0)) } }
         }
         dialog.show()
+    }
+
+    private class SortToggle(val root: LinearLayout, val delay: TextView, val name: TextView) {
+        var onChange: (NodeSort.Mode) -> Unit = {}
+        fun bind(mode: NodeSort.Mode) {
+            listOf(delay to NodeSort.Mode.Delay, name to NodeSort.Mode.Name).forEach { (v, m) ->
+                val on = m == mode
+                v.setTextColor(if (on) Color.WHITE else Ui.TEXT_SUB)
+                v.background = if (on) Ui.rounded(Ui.BLUE, v.resources.displayMetrics.density * 12) else null
+            }
+        }
+    }
+
+    /** Small segmented "延迟 | 名称" control. */
+    private fun sortToggle(): SortToggle {
+        val box = LinearLayout(c).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(c.dp(2), c.dp(2), c.dp(2), c.dp(2))
+            background = Ui.rounded(0xFFEFF2F6.toInt(), c.dp(14).toFloat())
+        }
+        fun seg(label: String) = c.text(label, 12f, Ui.TEXT_SUB, true).apply {
+            gravity = Gravity.CENTER
+            setPadding(c.dp(10), c.dp(3), c.dp(10), c.dp(3))
+        }
+        val d = seg(c.getString(R.string.zfy_sort_delay))
+        val n = seg(c.getString(R.string.zfy_sort_name))
+        box.addView(d); box.addView(n)
+        val t = SortToggle(box, d, n)
+        d.setOnClickListener { t.onChange(NodeSort.Mode.Delay) }
+        n.setOnClickListener { t.onChange(NodeSort.Mode.Name) }
+        t.bind(sort)
+        return t
     }
 
     private fun divider() = View(c).apply { setBackgroundColor(0xFFEDF1F6.toInt()) }

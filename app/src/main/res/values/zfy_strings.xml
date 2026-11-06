@@ -55,6 +55,8 @@
     <string name="zfy_node_count">%1$d 个节点</string>
     <string name="zfy_delay_ms">%1$dms</string>
     <string name="zfy_delay_timeout">超时</string>
+    <string name="zfy_sort_delay">延迟</string>
+    <string name="zfy_sort_name">名称</string>
     <string name="zfy_close">关闭</string>
     <string name="zfy_shop_title">续费 · 选择套餐</string>
     <string name="zfy_open_web">网页版</string>

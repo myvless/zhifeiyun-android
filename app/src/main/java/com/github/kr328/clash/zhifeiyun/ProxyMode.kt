@@ -2,6 +2,7 @@ package com.github.kr328.clash.zhifeiyun
 
 import android.content.Context
 import com.github.kr328.clash.core.Clash
+import com.github.kr328.clash.core.model.ProxySort
 import com.github.kr328.clash.core.model.TunnelState
 import com.github.kr328.clash.remote.Remote
 import com.github.kr328.clash.service.model.AccessControlMode
@@ -82,22 +83,62 @@ object ProxyModeManager {
         }
 
         val tunnel = if (mode == ProxyMode.Global) TunnelState.Mode.Global else TunnelState.Mode.Rule
+        val running = Remote.broadcasts.clashRunning
+        var patched = false
         runCatching {
             withClash {
                 val p = queryOverride(Clash.OverrideSlot.Persist)
                 if (p.mode != tunnel) {
                     p.mode = tunnel
-                    patchOverride(Clash.OverrideSlot.Persist, p)
+                    patchOverride(Clash.OverrideSlot.Persist, p) // triggers an async profile reload
+                    patched = true
                 }
                 // A session-level mode set in 高级 › 代理 would win over ours; drop it.
                 val s = queryOverride(Clash.OverrideSlot.Session)
                 if (s.mode != null) {
                     s.mode = null
                     patchOverride(Clash.OverrideSlot.Session, s)
+                    patched = true
                 }
             }
         }
-        return restart
+        if (!running || restart || !patched) return restart
+
+        // Hot apply while connected: wait for the reload, fix the GLOBAL selector, drop old conns.
+        val applied = runCatching { hotApply(tunnel) }.getOrDefault(false)
+        return !applied
+    }
+
+    /**
+     * Waits until the core runs [target] (the override reload is asynchronous), points GLOBAL at
+     * the main group in 全局, then closes every existing connection so apps reconnect through the
+     * new routing (mihomo keeps established connections on their old route across a reload).
+     * @return false when the core did not switch in time (caller restarts the VPN instead).
+     */
+    private suspend fun hotApply(target: TunnelState.Mode): Boolean {
+        val reached = withTimeoutOrNull(8000) {
+            while (withClash { queryTunnelState().mode } != target) delay(150)
+            true
+        } ?: false
+        if (!reached) return false
+        // The service restores saved selector choices right after Clash.load(); let that finish.
+        delay(500)
+        if (target == TunnelState.Mode.Global) {
+            pointGlobalToMain()
+            delay(600)
+            pointGlobalToMain() // in case a late selection restore overwrote it
+        }
+        withClash { closeAllConnections() }
+        return true
+    }
+
+    /** 全局 mode: route GLOBAL through the main (auto/selected) group instead of DIRECT. */
+    suspend fun pointGlobalToMain() {
+        val main = withClash { queryProxyGroupNames(true) }.firstOrNull { it != "GLOBAL" } ?: return
+        val global = withClash { queryProxyGroup("GLOBAL", ProxySort.Default) }
+        if (global.now != main && global.proxies.any { it.name == main }) {
+            withClash { patchSelector("GLOBAL", main) }
+        }
     }
 
     /** Re-applies the stored settings (used before starting the VPN). */

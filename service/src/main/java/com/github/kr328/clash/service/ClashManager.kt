@@ -58,6 +58,10 @@ class ClashManager(private val context: Context) : IClashManager,
         }
     }
 
+    override fun closeAllConnections() {
+        Clash.closeAllConnections()
+    }
+
     override fun patchOverride(slot: Clash.OverrideSlot, configuration: ConfigurationOverride) {
         Clash.patchOverride(slot, configuration)
 
