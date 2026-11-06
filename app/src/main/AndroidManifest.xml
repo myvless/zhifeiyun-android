@@ -72,6 +72,18 @@
         </activity-alias>
 
         <activity
+            android:name=".LoginActivity"
+            android:configChanges="uiMode|orientation|screenSize"
+            android:exported="false"
+            android:label="@string/launch_name"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
+            android:name=".AdvancedActivity"
+            android:configChanges="uiMode"
+            android:exported="false"
+            android:label="@string/zfy_advanced" />
+
+        <activity
             android:name=".ExternalControlActivity"
             android:excludeFromRecents="true"
             android:exported="true"

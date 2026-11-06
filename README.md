@@ -1,3 +1,16 @@
+# 智飞云 Android
+
+智飞云 is a branded, simplified build of [ClashMetaForAndroid](https://github.com/MetaCubeX/ClashMetaForAndroid)
+by MetaCubeX (itself based on Kr328/ClashForAndroid), using the [mihomo](https://github.com/MetaCubeX/mihomo) core.
+Licensed under GPL-3.0 (see `LICENSE`). All credit for the proxy engine and original app goes to the upstream authors.
+
+Changes in this fork: SSPanel-UIM account login (panel.020178.xyz), automatic subscription import,
+beginner home screen (one connect button, current node, remaining traffic, expiry, renew),
+original CMFA screens moved under "高级". Parsing of the panel lives in
+`app/src/main/java/com/github/kr328/clash/zhifeiyun/PanelParser.kt`.
+
+---
+
 ## Clash Meta for Android
 
 A Graphical user interface of [Clash.Meta](https://github.com/MetaCubeX/Clash.Meta) for Android
