@@ -2,6 +2,7 @@ package com.github.kr328.clash
 
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -10,15 +11,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
-import com.github.kr328.clash.core.model.Proxy
 import com.github.kr328.clash.core.model.ProxySort
 import com.github.kr328.clash.core.model.TunnelState
 import com.github.kr328.clash.util.startClashService
 import com.github.kr328.clash.util.stopClashService
 import com.github.kr328.clash.util.withClash
 import com.github.kr328.clash.zhifeiyun.AccountStore
+import com.github.kr328.clash.zhifeiyun.NodePickerSheet
 import com.github.kr328.clash.zhifeiyun.PanelClient
-import com.github.kr328.clash.zhifeiyun.PanelConfig
 import com.github.kr328.clash.zhifeiyun.PanelParser
 import com.github.kr328.clash.zhifeiyun.ProxyMode
 import com.github.kr328.clash.zhifeiyun.ProxyModeManager
@@ -74,14 +74,14 @@ class MainActivity : BaseActivity<SimpleMainDesign>() {
                             if (clashRunning) stopClashService() else design.startClash()
                         }
                         SimpleMainDesign.Request.OpenNodes -> showNodes(design)
-                        SimpleMainDesign.Request.Renew -> openUrl(PanelConfig.SHOP_URL)
+                        SimpleMainDesign.Request.Renew -> openShop(design)
                         SimpleMainDesign.Request.Advanced ->
                             startActivity(Intent(this@MainActivity, AdvancedActivity::class.java))
                         SimpleMainDesign.Request.Logout -> confirmLogout()
                         SimpleMainDesign.Request.Refresh -> manualRefresh(design)
                         SimpleMainDesign.Request.ModeRule -> switchMode(design, ProxyMode.Rule)
                         SimpleMainDesign.Request.ModeGlobal -> switchMode(design, ProxyMode.Global)
-                        SimpleMainDesign.Request.ModeApps -> switchMode(design, ProxyMode.Apps)
+                        SimpleMainDesign.Request.TogglePerApp -> setPerApp(design, design.perAppChecked)
                         SimpleMainDesign.Request.PickApps ->
                             startActivity(Intent(this@MainActivity, AppPickerActivity::class.java))
                     }
@@ -105,30 +105,59 @@ class MainActivity : BaseActivity<SimpleMainDesign>() {
 
     private suspend fun refreshMode(design: SimpleMainDesign) {
         val mode = ProxyModeManager.current(this)
-        val count = withContext(Dispatchers.IO) { ProxyModeManager.selectedApps(this@MainActivity).size }
-        design.setMode(mode, count)
+        val perApp = ProxyModeManager.perApp(this)
+        val icons = if (perApp) withContext(Dispatchers.IO) { selectedAppIcons() } else emptyList()
+        design.setMode(mode, perApp, icons)
     }
 
+    /** Icons of the selected (still installed) apps, sorted by label. */
+    private fun selectedAppIcons(): List<Drawable> {
+        val pm = packageManager
+        return ProxyModeManager.selectedApps(this).mapNotNull { pkg ->
+            runCatching {
+                val ai = pm.getApplicationInfo(pkg, 0)
+                ai.loadLabel(pm).toString() to ai.loadIcon(pm)
+            }.getOrNull()
+        }.sortedBy { it.first }.map { it.second }
+    }
+
+    /** 分流 / 全局: remembered as the last proxy mode; also used by selected apps when per-app is on. */
     private suspend fun switchMode(design: SimpleMainDesign, mode: ProxyMode) {
-        if (mode == ProxyModeManager.current(this)) {
-            if (mode == ProxyMode.Apps) startActivity(Intent(this, AppPickerActivity::class.java))
-            return
-        }
+        if (mode == ProxyModeManager.current(this)) return
+        val perApp = ProxyModeManager.perApp(this)
+        val restart = ProxyModeManager.apply(this, mode, perApp)
+        if (clashRunning && restart) reconnect(design)
+        refreshAll(design)
+    }
+
+    /** 仅代理所选应用 on/off; keeps the current 分流/全局 choice. */
+    private suspend fun setPerApp(design: SimpleMainDesign, on: Boolean) {
+        if (on == ProxyModeManager.perApp(this)) return
         val count = withContext(Dispatchers.IO) { ProxyModeManager.selectedApps(this@MainActivity).size }
-        design.setMode(mode, count)
-        val restart = ProxyModeManager.apply(this, mode)
-        if (mode == ProxyMode.Apps && count == 0) {
+        val restart = ProxyModeManager.apply(this, ProxyModeManager.current(this), on)
+        refreshMode(design)
+        if (on && count == 0) {
             Toast.makeText(this, R.string.zfy_no_apps_selected, Toast.LENGTH_LONG).show()
             startActivity(Intent(this, AppPickerActivity::class.java))
         }
-        if (clashRunning && restart) {
-            Toast.makeText(this, R.string.zfy_reconnecting, Toast.LENGTH_SHORT).show()
-            connecting = true
-            design.setState(SimpleMainDesign.State.Connecting)
-            ProxyModeManager.restartVpn(this)
-            connecting = false
-        }
+        if (clashRunning && restart) reconnect(design)
         refreshAll(design)
+    }
+
+    private suspend fun reconnect(design: SimpleMainDesign) {
+        Toast.makeText(this, R.string.zfy_reconnecting, Toast.LENGTH_SHORT).show()
+        connecting = true
+        design.setState(SimpleMainDesign.State.Connecting)
+        ProxyModeManager.restartVpn(this)
+        connecting = false
+    }
+
+    private suspend fun openShop(design: SimpleMainDesign) {
+        val result = startActivityForResult(
+            ActivityResultContracts.StartActivityForResult(),
+            Intent(this, ShopActivity::class.java)
+        )
+        if (result.resultCode == RESULT_OK) manualRefresh(design)
     }
 
     private suspend fun refreshAccount(design: SimpleMainDesign) {
@@ -195,9 +224,6 @@ class MainActivity : BaseActivity<SimpleMainDesign>() {
         }
     }
 
-    private fun delayLabel(p: Proxy): String =
-        if (p.delay in 1..60000) "  ${p.delay}ms" else ""
-
     private suspend fun showNodes(design: SimpleMainDesign) {
         if (!clashRunning) {
             Toast.makeText(this, R.string.zfy_connect_first, Toast.LENGTH_SHORT).show()
@@ -210,29 +236,20 @@ class MainActivity : BaseActivity<SimpleMainDesign>() {
         if (g.proxies.isEmpty()) {
             Toast.makeText(this, R.string.zfy_no_nodes, Toast.LENGTH_SHORT).show(); return
         }
-        val names = g.proxies.map { it.name }
-        val labels = g.proxies.map { (it.title.ifBlank { it.name }) + delayLabel(it) }.toTypedArray()
-        val checked = names.indexOf(g.now)
-
         withContext(Dispatchers.Main) {
-            AlertDialog.Builder(this@MainActivity)
-                .setTitle(R.string.zfy_choose_node)
-                .setSingleChoiceItems(labels, checked) { d, which ->
-                    d.dismiss()
+            NodePickerSheet(
+                this@MainActivity, this@MainActivity,
+                onSelect = { name ->
                     this@MainActivity.launch {
-                        withClash { patchSelector(group, names[which]) }
+                        runCatching { withClash { patchSelector(group, name) } }
                         refreshNode(design)
                     }
-                }
-                .setNeutralButton(R.string.zfy_speed_test) { _, _ ->
-                    this@MainActivity.launch {
-                        Toast.makeText(this@MainActivity, R.string.zfy_testing, Toast.LENGTH_SHORT).show()
-                        runCatching { withClash { healthCheck(group) } }
-                        showNodes(design)
-                    }
-                }
-                .setNegativeButton(android.R.string.cancel, null)
-                .show()
+                },
+                onSpeedTest = {
+                    runCatching { withClash { healthCheck(group) } }
+                    runCatching { withClash { queryProxyGroup(group, ProxySort.Default) } }.getOrNull()?.proxies
+                },
+            ).show(g.proxies, g.now)
         }
     }
 
@@ -277,7 +294,7 @@ class MainActivity : BaseActivity<SimpleMainDesign>() {
             Toast.makeText(this@MainActivity, R.string.zfy_sub_import_failed, Toast.LENGTH_LONG).show()
             return
         }
-        runCatching { ProxyModeManager.apply(this@MainActivity, ProxyModeManager.current(this@MainActivity)) }
+        runCatching { ProxyModeManager.applyStored(this@MainActivity) }
         val vpnRequest = startClashService()
         try {
             if (vpnRequest != null) {

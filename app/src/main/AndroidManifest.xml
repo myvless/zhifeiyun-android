@@ -84,6 +84,18 @@
             android:label="@string/zfy_pick_apps_title"
             android:windowSoftInputMode="adjustResize|stateHidden" />
         <activity
+            android:name=".ShopActivity"
+            android:configChanges="uiMode|orientation|screenSize"
+            android:exported="false"
+            android:label="@string/zfy_renew"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
+        <activity
+            android:name=".PanelWebActivity"
+            android:configChanges="uiMode|orientation|screenSize|keyboardHidden"
+            android:exported="false"
+            android:label="@string/zfy_renew"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
             android:name=".AdvancedActivity"
             android:configChanges="uiMode"
             android:exported="false"

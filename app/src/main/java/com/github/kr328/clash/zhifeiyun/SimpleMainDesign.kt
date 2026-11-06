@@ -1,7 +1,9 @@
 package com.github.kr328.clash.zhifeiyun
 
 import android.content.Context
+import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
@@ -9,6 +11,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.appcompat.widget.SwitchCompat
 import com.github.kr328.clash.R
 import com.github.kr328.clash.design.Design
 import com.github.kr328.clash.zhifeiyun.Ui.dp
@@ -20,7 +23,7 @@ import kotlinx.coroutines.withContext
 
 /** Beginner-friendly home screen, built in code (no data binding). */
 class SimpleMainDesign(context: Context) : Design<SimpleMainDesign.Request>(context) {
-    enum class Request { Toggle, OpenNodes, Renew, Advanced, Logout, Refresh, ModeRule, ModeGlobal, ModeApps, PickApps }
+    enum class Request { Toggle, OpenNodes, Renew, Advanced, Logout, Refresh, ModeRule, ModeGlobal, TogglePerApp, PickApps }
 
     enum class State { Disconnected, Connecting, Connected }
 
@@ -34,7 +37,13 @@ class SimpleMainDesign(context: Context) : Design<SimpleMainDesign.Request>(cont
     private val modeTabs = ArrayList<TextView>()
     private val modeHint: TextView
     private val appsEntry: LinearLayout
-    private val appsEntryText: TextView
+    private val appsDivider: View
+    private val appIcons: AppIconStrip
+    private lateinit var perAppSwitch: SwitchCompat
+    private var bindingSwitch = false
+
+    /** Whether the per-app switch is currently on (read by the activity on TogglePerApp). */
+    val perAppChecked: Boolean get() = perAppSwitch.isChecked
 
     override val root: View
 
@@ -81,7 +90,7 @@ class SimpleMainDesign(context: Context) : Design<SimpleMainDesign.Request>(cont
         col.addView(statusText, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = c.dp(12) })
 
-        // Mode selector: 分流 / 全局 / 应用
+        // Mode selector: 分流 / 全局 (last choice is remembered and also used for per-app)
         val seg = LinearLayout(c).apply {
             orientation = LinearLayout.HORIZONTAL
             background = Ui.rounded(Color.WHITE, c.dp(22).toFloat(), 0xFFE1E7EF.toInt(), c.dp(1))
@@ -91,7 +100,6 @@ class SimpleMainDesign(context: Context) : Design<SimpleMainDesign.Request>(cont
         listOf(
             R.string.zfy_mode_rule to Request.ModeRule,
             R.string.zfy_mode_global to Request.ModeGlobal,
-            R.string.zfy_mode_apps to Request.ModeApps,
         ).forEach { (label, req) ->
             val tab = c.text(c.getString(label), 15f, Ui.TEXT_SUB, true).apply {
                 gravity = Gravity.CENTER
@@ -108,17 +116,56 @@ class SimpleMainDesign(context: Context) : Design<SimpleMainDesign.Request>(cont
         col.addView(modeHint, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = c.dp(8) })
 
-        appsEntry = card(c).apply {
+        // Per-app card: 仅代理所选应用 switch + 加速APP row with icons
+        val appsCard = card(c).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(c.dp(18), c.dp(6), c.dp(14), c.dp(6))
+        }
+        val switchRow = LinearLayout(c).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(c.dp(18), c.dp(12), c.dp(18), c.dp(12))
-            setOnClickListener { requests.trySend(Request.PickApps) }
-            visibility = View.GONE
+            setPadding(0, c.dp(8), 0, c.dp(8))
+            setOnClickListener { perAppSwitch.toggle() }
         }
-        appsEntryText = c.text("", 15f, Ui.TEXT, true)
-        appsEntry.addView(appsEntryText, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        appsEntry.addView(c.text("›", 20f, Ui.BLUE))
-        col.addView(appsEntry, cardParams(c, 12))
+        val switchText = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL }
+        switchText.addView(c.text(c.getString(R.string.zfy_per_app_title), 15f, Ui.TEXT, true))
+        switchText.addView(c.text(c.getString(R.string.zfy_per_app_hint), 12f, Ui.TEXT_SUB).apply {
+            setPadding(0, c.dp(2), c.dp(8), 0)
+        })
+        switchRow.addView(switchText, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        perAppSwitch = SwitchCompat(c).apply {
+            thumbTintList = ColorStateList(
+                arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                intArrayOf(Ui.BLUE, 0xFFF5F7FA.toInt())
+            )
+            trackTintList = ColorStateList(
+                arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                intArrayOf(0x661E7BEF, 0x33000000)
+            )
+            setOnCheckedChangeListener { _, _ ->
+                if (!bindingSwitch) requests.trySend(Request.TogglePerApp)
+            }
+        }
+        switchRow.addView(perAppSwitch)
+        appsCard.addView(switchRow)
+
+        appsDivider = View(c).apply { setBackgroundColor(0xFFEDF1F6.toInt()) }
+        appsCard.addView(appsDivider, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1))
+
+        appsEntry = LinearLayout(c).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, c.dp(12), 0, c.dp(12))
+            setOnClickListener { requests.trySend(Request.PickApps) }
+        }
+        appsEntry.addView(c.text(c.getString(R.string.zfy_accel_apps), 15f, Ui.TEXT, true))
+        appIcons = AppIconStrip(c)
+        appsEntry.addView(appIcons, LinearLayout.LayoutParams(0, c.dp(28), 1f).apply {
+            leftMargin = c.dp(12); rightMargin = c.dp(6)
+        })
+        appsEntry.addView(c.text("›", 22f, Ui.TEXT_SUB))
+        appsCard.addView(appsEntry)
+        col.addView(appsCard, cardParams(c, 12))
 
         // Node card
         val nodeCard = card(c).apply {
@@ -180,10 +227,10 @@ class SimpleMainDesign(context: Context) : Design<SimpleMainDesign.Request>(cont
         }
 
         applyState(State.Disconnected)
-        applyMode(ProxyMode.Rule, 0)
+        applyMode(ProxyMode.Rule, false, emptyList())
     }
 
-    private fun applyMode(mode: ProxyMode, appCount: Int) {
+    private fun applyMode(mode: ProxyMode, perApp: Boolean, icons: List<Drawable>) {
         val c = context
         modeTabs.forEachIndexed { i, tab ->
             val on = i == mode.ordinal
@@ -191,15 +238,19 @@ class SimpleMainDesign(context: Context) : Design<SimpleMainDesign.Request>(cont
             tab.setTextColor(if (on) Color.WHITE else Ui.TEXT_SUB)
         }
         modeHint.text = c.getString(when (mode) {
-            ProxyMode.Rule -> R.string.zfy_mode_rule_hint
-            ProxyMode.Global -> R.string.zfy_mode_global_hint
-            ProxyMode.Apps -> R.string.zfy_mode_apps_hint
+            ProxyMode.Rule -> if (perApp) R.string.zfy_mode_rule_hint_apps else R.string.zfy_mode_rule_hint
+            ProxyMode.Global -> if (perApp) R.string.zfy_mode_global_hint_apps else R.string.zfy_mode_global_hint
         })
-        appsEntry.visibility = if (mode == ProxyMode.Apps) View.VISIBLE else View.GONE
-        appsEntryText.text = c.getString(R.string.zfy_pick_apps_entry, appCount)
+        bindingSwitch = true
+        perAppSwitch.isChecked = perApp
+        bindingSwitch = false
+        appsDivider.visibility = if (perApp) View.VISIBLE else View.GONE
+        appsEntry.visibility = if (perApp) View.VISIBLE else View.GONE
+        appIcons.setIcons(icons)
     }
 
-    suspend fun setMode(mode: ProxyMode, appCount: Int) = withContext(Dispatchers.Main) { applyMode(mode, appCount) }
+    suspend fun setMode(mode: ProxyMode, perApp: Boolean, icons: List<Drawable>) =
+        withContext(Dispatchers.Main) { applyMode(mode, perApp, icons) }
 
     private fun card(c: Context) = LinearLayout(c).apply {
         background = Ui.rounded(Color.WHITE, c.dp(16).toFloat())

@@ -128,6 +128,7 @@ jobs:
           body: |
             智飞云 Android v${{ steps.ver.outputs.version }}
             - 推荐下载 `*-arm64-v8a-*.apk`（绝大多数手机）；不确定就下载 `*-universal-*.apk`。
+            - 目前每次构建使用一次性签名：安装新版本前请先卸载旧版本（需重新登录）。
             - 基于开源项目 [ClashMetaForAndroid](https://github.com/MetaCubeX/ClashMetaForAndroid)（MetaCubeX，GPL-3.0）与 mihomo 内核。
           files: app/build/outputs/apk/meta/release/*.apk
           overwrite_files: true

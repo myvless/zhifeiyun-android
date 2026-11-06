@@ -6,7 +6,6 @@ import android.content.pm.PackageManager
 import android.widget.Toast
 import com.github.kr328.clash.zhifeiyun.AppPickerDesign
 import com.github.kr328.clash.zhifeiyun.PickApp
-import com.github.kr328.clash.zhifeiyun.ProxyMode
 import com.github.kr328.clash.zhifeiyun.ProxyModeManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
@@ -15,7 +14,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
 
-/** 选择应用: which apps go through the VPN in 应用 mode (CMFA access-control list). */
+/** 选择应用: which apps go through the VPN when 仅代理所选应用 is on (CMFA access-control list). */
 class AppPickerActivity : BaseActivity<AppPickerDesign>() {
     override suspend fun main() {
         val ctx = applicationContext
@@ -30,7 +29,7 @@ class AppPickerActivity : BaseActivity<AppPickerDesign>() {
             design.close()
             val now = selected.toSet()
             withContext(Dispatchers.IO) { ProxyModeManager.saveSelectedApps(ctx, now) }
-            if (now != original && clashRunning && ProxyModeManager.current(ctx) == ProxyMode.Apps) {
+            if (now != original && clashRunning && ProxyModeManager.perApp(ctx)) {
                 Toast.makeText(ctx, R.string.zfy_reconnecting, Toast.LENGTH_SHORT).show()
                 // Restart outside this activity's scope so closing the screen is instant.
                 restartScope.launch { ProxyModeManager.restartVpn(ctx) }

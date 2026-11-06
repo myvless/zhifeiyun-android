@@ -14,28 +14,37 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
-/** Home-screen routing choice: 分流 / 全局 / 应用. */
-enum class ProxyMode { Rule, Global, Apps }
+/** Home-screen routing choice: 分流 / 全局. Independent of the per-app switch. */
+enum class ProxyMode { Rule, Global }
 
 /**
- * Maps the home-screen choice onto CMFA's own mechanisms:
- *  - Clash tunnel mode via the persist override slot (same as 高级 › 覆写 › 模式),
- *  - per-app VPN via ServiceStore.accessControlMode / accessControlPackages
- *    (same as 高级 › 网络 › 访问控制).
+ * Two independent settings:
+ *  - the last proxy mode the user chose (分流 = Clash rule, 全局 = Clash global), applied via
+ *    the persist override slot (same as 高级 › 覆写 › 模式);
+ *  - "仅代理所选应用" (per-app VPN), applied via ServiceStore.accessControlMode /
+ *    accessControlPackages (same as 高级 › 网络 › 访问控制).
+ * With per-app on, the selected apps use whichever mode was chosen last.
  */
 object ProxyModeManager {
     private const val PREFS = "zhifeiyun_settings"
-    private const val KEY_MODE = "proxy_mode"
+    private const val KEY_MODE = "proxy_mode"           // "Rule" | "Global" ("Apps" in v1.1.0)
+    private const val KEY_PER_APP = "per_app_enabled"
     private const val KEY_SHOW_SYSTEM = "picker_show_system"
 
     private fun prefs(c: Context) = c.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-    fun current(c: Context): ProxyMode {
-        val saved = prefs(c).getString(KEY_MODE, null)
-        if (saved != null) return runCatching { ProxyMode.valueOf(saved) }.getOrDefault(ProxyMode.Rule)
-        // First run after upgrade: honour an access-control setup made in 高级.
-        return if (ServiceStore(c).accessControlMode == AccessControlMode.AcceptSelected) ProxyMode.Apps
-        else ProxyMode.Rule
+    /** Last chosen 分流/全局 mode. v1.1.0's "Apps" value meant rule mode. */
+    fun current(c: Context): ProxyMode = when (prefs(c).getString(KEY_MODE, null)) {
+        "Global" -> ProxyMode.Global
+        else -> ProxyMode.Rule
+    }
+
+    fun perApp(c: Context): Boolean {
+        val p = prefs(c)
+        if (p.contains(KEY_PER_APP)) return p.getBoolean(KEY_PER_APP, false)
+        // Upgrade from v1.1.0 (mode "Apps") or an access-control setup made in 高级.
+        if (p.getString(KEY_MODE, null) == "Apps") return true
+        return ServiceStore(c).accessControlMode == AccessControlMode.AcceptSelected
     }
 
     fun showSystemApps(c: Context): Boolean = prefs(c).getBoolean(KEY_SHOW_SYSTEM, false)
@@ -51,17 +60,20 @@ object ProxyModeManager {
     }
 
     /**
-     * Persists [mode] and pushes it to the service/core.
+     * Persists [mode] / [perApp] and pushes them to the service/core.
      * @return true when the VPN must be restarted for the change to take effect
      *         (access control is read only when the TUN interface is built).
      */
-    suspend fun apply(c: Context, mode: ProxyMode): Boolean {
+    suspend fun apply(c: Context, mode: ProxyMode, perApp: Boolean): Boolean {
         val restart = withContext(Dispatchers.IO) {
-            prefs(c).edit().putString(KEY_MODE, mode.name).commit()
+            prefs(c).edit()
+                .putString(KEY_MODE, mode.name)
+                .putBoolean(KEY_PER_APP, perApp)
+                .commit()
             val srv = ServiceStore(c)
             val old = srv.accessControlMode
             val new = when {
-                mode == ProxyMode.Apps -> AccessControlMode.AcceptSelected
+                perApp -> AccessControlMode.AcceptSelected
                 old == AccessControlMode.AcceptSelected -> AccessControlMode.AcceptAll
                 else -> old // keep a DenySelected list configured in 高级
             }
@@ -87,6 +99,9 @@ object ProxyModeManager {
         }
         return restart
     }
+
+    /** Re-applies the stored settings (used before starting the VPN). */
+    suspend fun applyStored(c: Context): Boolean = apply(c, current(c), perApp(c))
 
     /** Stop and start the VPN so a new access-control list is applied. */
     suspend fun restartVpn(c: Context) {

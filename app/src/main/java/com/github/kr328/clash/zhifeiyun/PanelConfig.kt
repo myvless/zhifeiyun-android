@@ -4,7 +4,9 @@ import java.util.concurrent.TimeUnit
 
 object PanelConfig {
     const val BASE_URL = "https://panel.020178.xyz"
-    const val SHOP_URL = "$BASE_URL/user/shop"
+    // Current SSPanel-UIM: products at /user/product (/user/shop returns 404 on this panel).
+    const val PRODUCT_PATH = "/user/product"
+    const val SHOP_URL = "$BASE_URL$PRODUCT_PATH"
     const val REGISTER_URL = "$BASE_URL/auth/register"
     const val RESET_URL = "$BASE_URL/password/reset"
     const val PROFILE_NAME = "智飞云"
