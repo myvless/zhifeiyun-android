@@ -15,6 +15,7 @@ import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.github.kr328.clash.zhifeiyun.AccountStore
 import com.github.kr328.clash.zhifeiyun.PanelClient
@@ -31,7 +32,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
 
 class LoginActivity : AppCompatActivity(), CoroutineScope by MainScope() {
     private lateinit var emailInput: EditText
@@ -157,7 +160,14 @@ class LoginActivity : AppCompatActivity(), CoroutineScope by MainScope() {
                         setBusy(false, result.message); return@launch
                     }
                     PanelClient.LoginResult.NeedMfa -> {
-                        setBusy(false, getString(R.string.zfy_mfa_unsupported)); return@launch
+                        val code = askTotp()
+                        if (code.isNullOrBlank()) {
+                            setBusy(false, getString(R.string.zfy_mfa_unsupported)); return@launch
+                        }
+                        val r2 = withContext(Dispatchers.IO) { client.submitTotp(code) }
+                        if (r2 is PanelClient.LoginResult.Failed) {
+                            setBusy(false, r2.message); return@launch
+                        }
                     }
                     PanelClient.LoginResult.Success -> Unit
                 }
@@ -190,6 +200,32 @@ class LoginActivity : AppCompatActivity(), CoroutineScope by MainScope() {
                 setBusy(false, getString(R.string.zfy_network_error) + "\n" + (e.message ?: e.javaClass.simpleName))
             }
         }
+    }
+
+    private suspend fun askTotp(): String? = suspendCancellableCoroutine { cont ->
+        val input = EditText(this).apply {
+            hint = getString(R.string.zfy_totp_hint)
+            inputType = InputType.TYPE_CLASS_NUMBER
+            setSingleLine(true)
+        }
+        val box = LinearLayout(this).apply {
+            setPadding(dp(24), dp(8), dp(24), 0)
+            addView(input, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+        }
+        var done = false
+        AlertDialog.Builder(this)
+            .setTitle(R.string.zfy_totp_title)
+            .setView(box)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                if (!done) { done = true; cont.resume(input.text.toString()) }
+            }
+            .setNegativeButton(android.R.string.cancel) { _, _ ->
+                if (!done) { done = true; cont.resume(null) }
+            }
+            .setOnCancelListener {
+                if (!done) { done = true; cont.resume(null) }
+            }
+            .show()
     }
 
     private fun openUrl(url: String) {

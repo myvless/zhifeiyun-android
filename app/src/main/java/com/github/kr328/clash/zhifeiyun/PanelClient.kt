@@ -58,6 +58,26 @@ class PanelClient(private val cookies: MutableMap<String, String> = mutableMapOf
         return LoginResult.Failed("登录失败（HTTP ${resp.code}）")
     }
 
+    /** Second step for accounts with TOTP 2FA: POST /auth/totp (code) within the same session. */
+    fun submitTotp(code: String): LoginResult {
+        val resp = request(
+            "POST", PanelConfig.BASE_URL + "/auth/totp",
+            "code=" + URLEncoder.encode(code.trim(), "UTF-8"),
+            mapOf(
+                "Content-Type" to "application/x-www-form-urlencoded; charset=UTF-8",
+                "HX-Request" to "true",
+                "Accept" to "*/*",
+                "Origin" to PanelConfig.BASE_URL,
+                "Referer" to PanelConfig.BASE_URL + "/auth/mfa",
+            )
+        )
+        val parsed = PanelParser.parseRetMsg(resp.body)
+        val hxRedirect = header(resp, "HX-Redirect")
+        if (parsed != null && parsed.first == 1) return LoginResult.Success
+        if (parsed == null && hxRedirect != null && !hxRedirect.contains("login")) return LoginResult.Success
+        return LoginResult.Failed(parsed?.second?.ifBlank { null } ?: "验证码错误")
+    }
+
     /** Fetches /user. Returns null if the session is no longer valid. */
     fun fetchUserPage(): String? {
         val resp = request("GET", PanelConfig.BASE_URL + "/user")
