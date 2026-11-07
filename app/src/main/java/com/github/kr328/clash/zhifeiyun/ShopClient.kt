@@ -16,6 +16,20 @@ class ShopClient(context: Context) {
     private val store = AccountStore(context)
     private var client = PanelClient(store.cookies.toMutableMap())
 
+    /**
+     * Currency symbol of the panel, detected from every page this client reads (the panel shows
+     * "美元" and a dollar icon). Defaults to "$" when no page has said otherwise; never ¥ by default.
+     */
+    @Volatile
+    var currency: String = DEFAULT_CURRENCY
+        private set
+
+    @Volatile
+    private var dollarSeen = false
+
+    /** Formats an amount with the panel's currency, e.g. "0.30" -> "$0.30". */
+    fun money(amount: String?): String? = ShopParser.formatMoney(amount, currency)
+
     fun reloadCookies() {
         client = PanelClient(store.cookies.toMutableMap())
     }
@@ -29,6 +43,11 @@ class ShopClient(context: Context) {
         save()
         if (ShopParser.isLoggedOut(resp.code, resp.location, resp.body)) throw SessionExpired()
         if (resp.code !in 200..299) throw ParseFailed(PanelConfig.BASE_URL + path)
+        ShopParser.detectCurrency(resp.body)?.let { found ->
+            // Once any page has said dollars, keep it; other symbols only replace the default.
+            if (!dollarSeen) currency = found
+            if (found == "$") dollarSeen = true
+        }
         return resp.body
     }
 
@@ -105,6 +124,7 @@ class ShopClient(context: Context) {
     }
 
     companion object {
+        const val DEFAULT_CURRENCY = "$"
         fun orderCreatePath(productId: String) = "/user/order/create?product_id=$productId"
         fun invoicePath(id: String) = "/user/invoice/$id/view"
         fun absolute(url: String) = if (url.startsWith("http")) url else PanelConfig.BASE_URL + url

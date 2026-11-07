@@ -80,9 +80,9 @@
     <string name="zfy_amount_due">应付金额</string>
     <string name="zfy_pay_method">选择支付方式</string>
     <string name="zfy_no_pay_method">暂无可用的支付方式，请点右上角“网页版”查看</string>
-    <string name="zfy_pay_balance">余额支付（可用 ¥%1$s）</string>
-    <string name="zfy_pay_balance_confirm">确认使用账户余额支付 ¥%1$s？</string>
-    <string name="zfy_go_pay">去支付 ¥%1$s</string>
+    <string name="zfy_pay_balance">余额支付（可用 %1$s）</string>
+    <string name="zfy_pay_balance_confirm">确认使用账户余额支付 %1$s？</string>
+    <string name="zfy_go_pay">去支付 %1$s</string>
     <string name="zfy_paid_refresh">我已完成支付，刷新状态</string>
     <string name="zfy_paid_done">支付完成，套餐已生效</string>
     <string name="zfy_paid_toast">支付成功！正在更新流量和到期时间</string>

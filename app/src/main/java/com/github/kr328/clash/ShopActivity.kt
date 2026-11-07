@@ -261,7 +261,7 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
             gravity = Gravity.CENTER_VERTICAL
         }
         top.addView(text(p.name, 16f, Ui.TEXT, true), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        top.addView(text(p.price?.let { "¥$it" } ?: "", 19f, Ui.BLUE, true).apply {
+        top.addView(text(shop.money(p.price) ?: "", 19f, Ui.BLUE, true).apply {
             setPadding(dp(8), 0, 0, 0)
         })
         c.addView(top)
@@ -341,10 +341,10 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
         // Price
         val basePrice = pv?.price ?: p.price
         val priceCard = card()
-        priceCard.addView(kv(getString(R.string.zfy_price), basePrice?.let { "¥$it" } ?: "—"))
+        priceCard.addView(kv(getString(R.string.zfy_price), shop.money(basePrice) ?: "—"))
         val discountRow = kv(getString(R.string.zfy_discount), "").apply { visibility = View.GONE }
         priceCard.addView(discountRow)
-        val totalRow = kv(getString(R.string.zfy_total), basePrice?.let { "¥$it" } ?: "—", bold = true)
+        val totalRow = kv(getString(R.string.zfy_total), shop.money(basePrice) ?: "—", bold = true)
         priceCard.addView(totalRow)
         body.addView(priceCard, matchWrap().apply { topMargin = dp(12) })
 
@@ -362,11 +362,11 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
                 couponStatus.setTextColor(if (r.ok) Ui.GREEN else Ui.RED)
                 if (r.ok) {
                     discountRow.visibility = View.VISIBLE
-                    (discountRow.getChildAt(1) as TextView).text = "-¥" + (r.discount ?: "0")
-                    (totalRow.getChildAt(1) as TextView).text = "¥" + (r.total ?: basePrice ?: "—")
+                    (discountRow.getChildAt(1) as TextView).text = "-" + (shop.money(r.discount?.trim()?.trimStart('-') ?: "0") ?: "")
+                    (totalRow.getChildAt(1) as TextView).text = shop.money(r.total ?: basePrice) ?: "—"
                 } else {
                     discountRow.visibility = View.GONE
-                    (totalRow.getChildAt(1) as TextView).text = basePrice?.let { "¥$it" } ?: "—"
+                    (totalRow.getChildAt(1) as TextView).text = shop.money(basePrice) ?: "—"
                 }
             }
         }
@@ -429,13 +429,13 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
             })
         }
         head.addView(top)
-        head.addView(text(inv.price?.let { "¥$it" } ?: "—", 30f, Ui.TEXT, true).apply { setPadding(0, dp(8), 0, 0) })
+        head.addView(text(shop.money(inv.price) ?: "—", 30f, Ui.TEXT, true).apply { setPadding(0, dp(8), 0, 0) })
         head.addView(text(getString(R.string.zfy_amount_due), 12f, Ui.TEXT_SUB))
         body.addView(head, matchWrap())
 
         if (inv.items.isNotEmpty() || inv.info.isNotEmpty()) {
             val detail = card()
-            inv.items.forEach { (k, v) -> detail.addView(kv(k, v)) }
+            inv.items.forEach { (k, v) -> detail.addView(kv(k, shop.money(v) ?: v)) }
             inv.info.forEach { (k, v) -> detail.addView(kv(k, v, small = true)) }
             body.addView(detail, matchWrap().apply { topMargin = dp(12) })
         }
@@ -477,7 +477,7 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
                 val dot = View(this)
                 row.addView(dot, LinearLayout.LayoutParams(dp(18), dp(18)))
                 val label = if (o.kind == PayKind.Balance && inv.balance != null)
-                    getString(R.string.zfy_pay_balance, inv.balance) else o.label
+                    getString(R.string.zfy_pay_balance, shop.money(inv.balance) ?: inv.balance) else o.label
                 row.addView(text(label, 15f, Ui.TEXT), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
                     leftMargin = dp(12)
                 })
@@ -492,7 +492,7 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
             body.addView(listCard, matchWrap())
         }
 
-        val pay = primaryButton(getString(R.string.zfy_go_pay, inv.price ?: ""))
+        val pay = primaryButton(getString(R.string.zfy_go_pay, shop.money(inv.price) ?: ""))
         pay.isEnabled = inv.options.isNotEmpty()
         pay.setOnClickListener { option?.let { startPay(inv, it, pay) } }
         footer.addView(pay, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)))
@@ -511,7 +511,7 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
             }
             PayKind.Balance -> {
                 AlertDialog.Builder(this)
-                    .setMessage(getString(R.string.zfy_pay_balance_confirm, inv.price ?: ""))
+                    .setMessage(getString(R.string.zfy_pay_balance_confirm, shop.money(inv.price) ?: ""))
                     .setPositiveButton(android.R.string.ok) { _, _ -> doPay(inv, o, btn) }
                     .setNegativeButton(android.R.string.cancel, null)
                     .show()
