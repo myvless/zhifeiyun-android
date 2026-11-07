@@ -241,52 +241,152 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
             setPadding(dp(4), dp(4), 0, dp(4))
         })
         var lastCat: String? = "\u0000"
-        list.forEach { p ->
-            if (p.category != lastCat) {
-                lastCat = p.category
-                if (p.category != null) {
-                    body.addView(text(p.category, 14f, Ui.TEXT_SUB, true).apply {
+        ShopParser.groupProducts(list).forEach { g ->
+            if (g.category != lastCat) {
+                lastCat = g.category
+                if (g.category != null) {
+                    body.addView(text(g.category, 14f, Ui.TEXT_SUB, true).apply {
                         setPadding(dp(4), dp(14), 0, dp(2))
                     })
                 }
             }
-            body.addView(productCard(p), matchWrap().apply { topMargin = dp(10) })
+            body.addView(planCard(g), matchWrap().apply { topMargin = dp(10) })
         }
     }
 
-    private fun productCard(p: ShopParser.Product): View {
+    /** Selected period per plan card, kept while the activity lives (e.g. back from 确认订单). */
+    private val selectedOption = HashMap<String, String>()
+
+    private fun planKey(g: ShopParser.PlanGroup) = (g.category ?: "") + "\u0000" + g.name
+
+    /**
+     * One card per plan: heading, features, notes, a row of duration chips (月付 / 季付 / …, each with
+     * its price; sold-out ones disabled with 已售罄) and a 购买 button for the selected chip.
+     * Single-option plans show just their price.
+     */
+    private fun planCard(g: ShopParser.PlanGroup): View {
         val c = card()
+        val key = planKey(g)
+        var selected = g.options.firstOrNull { it.id == selectedOption[key] && it.available } ?: g.defaultOption()
+
         val top = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        top.addView(text(p.name, 16f, Ui.TEXT, true), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        top.addView(text(shop.money(p.price) ?: "", 19f, Ui.BLUE, true).apply {
-            setPadding(dp(8), 0, 0, 0)
+        top.addView(text(g.name, 17f, Ui.TEXT, true), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        val priceBox = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.BOTTOM
+        }
+        val priceView = text("", 21f, Ui.BLUE, true)
+        val periodView = text("", 12f, Ui.TEXT_SUB).apply { setPadding(dp(4), 0, 0, dp(3)) }
+        priceBox.addView(priceView)
+        priceBox.addView(periodView)
+        top.addView(priceBox, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            leftMargin = dp(8)
         })
         c.addView(top)
-        val featureLine = p.features.joinToString("  ·  ") { (k, v) -> "$k $v" }
-        if (featureLine.isNotEmpty()) {
-            c.addView(text(featureLine, 13f, Ui.TEXT_SUB).apply {
+
+        if (g.features.isNotEmpty()) {
+            val grid = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dp(8), 0, 0) }
+            g.features.forEach { (k, v) ->
+                val row = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    setPadding(0, dp(2), 0, dp(2))
+                }
+                row.addView(text(k, 13f, Ui.TEXT_SUB), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                row.addView(text(v, 13f, Ui.TEXT, true))
+                grid.addView(row)
+            }
+            c.addView(grid)
+        }
+        if (!g.description.isNullOrBlank()) {
+            c.addView(text(g.description, 12f, Ui.TEXT_SUB).apply {
                 setPadding(0, dp(6), 0, 0); setLineSpacing(0f, 1.15f)
             })
         }
-        if (!p.description.isNullOrBlank()) {
-            c.addView(text(p.description, 13f, Ui.TEXT_SUB).apply { setPadding(0, dp(4), 0, 0) })
+
+        val buy = primaryButton(getString(R.string.zfy_buy))
+        val chips = ArrayList<Pair<ShopParser.Product, TextView>>()
+
+        fun refresh() {
+            priceView.text = shop.money(selected.price) ?: "—"
+            val per = selected.period
+            periodView.text = if (per != null) "/ $per" else ""
+            periodView.visibility = if (per != null) View.VISIBLE else View.GONE
+            chips.forEach { (o, v) -> styleChip(v, o, o.id == selected.id) }
+            buy.isEnabled = selected.available
+            buy.alpha = if (selected.available) 1f else 0.5f
+            buy.text = getString(if (selected.available) R.string.zfy_buy else R.string.zfy_sold_out)
         }
-        if (p.available) {
-            c.setOnClickListener {
-                product = p
-                preview = null
-                loadConfirm()
+
+        if (g.options.size > 1) {
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            val weighted = g.options.size <= 5
+            val longest = g.options.maxOf { (shop.money(it.price) ?: "").length.coerceAtLeast(it.period?.length?.times(2) ?: 0) }
+            val chipSize = when { longest >= 9 -> 10f; longest >= 7 -> 11f; else -> 12f }
+            g.options.forEachIndexed { i, o ->
+                val chip = TextView(this).apply {
+                    gravity = Gravity.CENTER
+                    textSize = chipSize
+                    setLineSpacing(0f, 1.1f)
+                    maxLines = 2
+                    setPadding(dp(2), dp(7), dp(2), dp(7))
+                    isEnabled = o.available
+                    setOnClickListener {
+                        if (!o.available) return@setOnClickListener
+                        selected = o
+                        selectedOption[key] = o.id
+                        refresh()
+                    }
+                }
+                val lp = if (weighted) LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                else LinearLayout.LayoutParams(dp(72), ViewGroup.LayoutParams.WRAP_CONTENT)
+                if (i > 0) lp.leftMargin = dp(5)
+                row.addView(chip, lp)
+                chips += o to chip
             }
-        } else {
-            c.alpha = 0.5f
-            c.addView(text(getString(R.string.zfy_sold_out), 12f, Ui.RED, true).apply {
-                setPadding(0, dp(6), 0, 0)
-            })
+            val holder: View = if (weighted) row else android.widget.HorizontalScrollView(this).apply {
+                isHorizontalScrollBarEnabled = false
+                addView(row)
+            }
+            c.addView(holder, matchWrap().apply { topMargin = dp(12) })
         }
+
+        buy.setOnClickListener {
+            if (!selected.available) return@setOnClickListener
+            product = selected
+            preview = null
+            loadConfirm()
+        }
+        c.addView(buy, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(44)).apply { topMargin = dp(12) })
+        refresh()
+        if (!g.available) c.alpha = 0.6f
         return c
+    }
+
+    private fun styleChip(v: TextView, o: ShopParser.Product, on: Boolean) {
+        val period = o.period ?: getString(R.string.zfy_buy)
+        val second = if (o.available) shop.money(o.price) ?: "—" else getString(R.string.zfy_sold_out)
+        val span = android.text.SpannableStringBuilder(period).append("\n")
+        val start = span.length
+        span.append(second)
+        span.setSpan(android.text.style.StyleSpan(android.graphics.Typeface.BOLD), start, span.length, 0)
+        v.text = span
+        when {
+            !o.available -> {
+                v.setTextColor(Ui.MUTED)
+                v.background = Ui.rounded(Ui.SURFACE_ALT, dp(10).toFloat())
+            }
+            on -> {
+                v.setTextColor(Ui.BLUE)
+                v.background = Ui.rounded(Ui.SELECTED_ROW, dp(10).toFloat(), Ui.BLUE, dp(2))
+            }
+            else -> {
+                v.setTextColor(Ui.TEXT)
+                v.background = Ui.rounded(Ui.SURFACE_ALT, dp(10).toFloat(), Ui.BORDER, dp(1))
+            }
+        }
     }
 
     // ------------------------------------------------------------------ step 2: confirm + coupon

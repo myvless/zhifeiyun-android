@@ -37,7 +37,31 @@ object ShopParser {
         val features: List<Pair<String, String>>,
         val description: String?,
         val available: Boolean,
+        /** Card heading this product belongs to ("vip1"); equals [name] for one-product cards. */
+        val group: String = name,
+        /** Billing period from the button label ("月付", "1天"); null for a plain "购买" button. */
+        val period: String? = null,
     )
+
+    /**
+     * One plan card in the UI: every product sharing a card heading within one category tab,
+     * e.g. "vip1" with options 月付 / 季付 / 半年付 / 年付 / 永久 (one product_id each).
+     */
+    data class PlanGroup(
+        val name: String,
+        val category: String?,
+        val features: List<Pair<String, String>>,
+        val description: String?,
+        val options: List<Product>,
+    ) {
+        val available: Boolean get() = options.any { it.available }
+
+        /** 月付 when it can be bought, else the first purchasable option, else the first one. */
+        fun defaultOption(): Product =
+            options.firstOrNull { it.available && it.period == "月付" }
+                ?: options.firstOrNull { it.available }
+                ?: options.first()
+    }
 
     data class OrderPreview(
         val details: List<Pair<String, String>>,
@@ -91,6 +115,7 @@ object ShopParser {
     private fun isPriceLine(s: String): Boolean =
         priceLineRe.matches(s) && (s.contains('.') || currencyGlyphs.containsMatchIn(s))
 
+    private val soldOutWords = Regex("已售罄|售罄|告罄|缺货|已售完")
     private val glyphOnly = Regex("""^(?:[¥￥$€]|美元|元|USD|CNY)$""")
 
     private data class Pane(val id: String?, val start: Int, val end: Int, val title: String?)
@@ -137,7 +162,7 @@ object ShopParser {
             val priceMatch = nums.lastOrNull { it.value.contains('.') } ?: nums.lastOrNull()
             val labelNum = priceMatch?.value
             val variant = (if (priceMatch != null) labelPlain.removeRange(priceMatch.range) else labelPlain)
-                .replace(currencyGlyphs, " ").replace(Regex("\\s+"), " ").trim()
+                .replace(currencyGlyphs, " ").replace(soldOutWords, " ").replace(Regex("\\s+"), " ").trim()
             val isVariant = labelNum != null && variant.isNotEmpty() && variant.lowercase() !in buyWords
             val markerName = markerName(doc, id)
             val base = markerName ?: card.name
@@ -149,7 +174,13 @@ object ShopParser {
             val price = (if (labelNum != null) labelNum else null)
                 ?: markerPrice(doc, id)
                 ?: card.price
-            val soldOut = label.contains("告罄") || label.contains("售罄")
+            val aTag = doc.substring(aStart, aOpenEnd.coerceAtLeast(aStart))
+            val soldOut = soldOutWords.containsMatchIn(label) ||
+                Regex("""class\s*=\s*["'][^"']*\bdisabled\b|\sdisabled(?:[\s>=/])|aria-disabled\s*=\s*["']true""").containsMatchIn(aTag)
+            val period = variant.takeIf { isVariant }
+            val group = (base ?: name).let { g ->
+                if (period != null && g.endsWith(" $period")) g.removeSuffix(" $period").trim() else g
+            }
             found += Found(aStart, Product(
                 id = id,
                 name = name,
@@ -158,6 +189,8 @@ object ShopParser {
                 features = card.features,
                 description = card.description,
                 available = !soldOut,
+                group = group,
+                period = period,
             ))
         }
 
@@ -185,6 +218,28 @@ object ShopParser {
             return if (doc.contains("/user/product") || doc.contains("商品")) emptyList() else null
         }
         return found.sortedBy { it.pos }.map { it.product }
+    }
+
+    /**
+     * Groups products into plan cards by (category, card heading), keeping page order of both the
+     * cards and each card's periods. A product without a period ("购买" button) is its own card.
+     */
+    fun groupProducts(list: List<Product>): List<PlanGroup> {
+        val order = LinkedHashMap<String, MutableList<Product>>()
+        list.forEach { p ->
+            val key = (p.category ?: "") + "\u0000" + (if (p.period == null) p.name + "\u0000#" + p.id else p.group)
+            order.getOrPut(key) { ArrayList() } += p
+        }
+        return order.values.map { opts ->
+            val first = opts.first()
+            PlanGroup(
+                name = if (first.period == null) first.name else first.group,
+                category = first.category,
+                features = opts.firstOrNull { it.features.isNotEmpty() }?.features ?: emptyList(),
+                description = opts.firstNotNullOfOrNull { it.description },
+                options = opts,
+            )
+        }
     }
 
     private data class CardInfo(
