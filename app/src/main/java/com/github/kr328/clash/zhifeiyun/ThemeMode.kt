@@ -73,7 +73,28 @@ object ThemeMode {
         activities.toList().forEach { if (!it.isFinishing) it.recreate() }
     }
 
+    /** Set before a theme change from the home toggle so the recreated home screen focuses it again (D-pad). */
+    @Volatile
+    var refocusToggle = false
+
+    /**
+     * TV remote: OK on the toggle cycles 浅色 → 深色 → 跟随系统 → 浅色 …
+     * From 跟随系统 it goes to the opposite of what is shown now. Returns the new mode.
+     */
+    fun cycle(activities: Collection<Activity>): DarkMode {
+        val next = when (mode) {
+            DarkMode.ForceLight -> DarkMode.ForceDark
+            DarkMode.ForceDark -> DarkMode.Auto
+            DarkMode.Auto -> if (isNight) DarkMode.ForceLight else DarkMode.ForceDark
+        }
+        refocusToggle = true
+        set(next, activities)
+        return next
+    }
+
     /** Tap on the sun/moon button: flip whatever is currently shown to the opposite. */
-    fun toggle(activities: Collection<Activity>) =
+    fun toggle(activities: Collection<Activity>) {
+        refocusToggle = true
         set(if (isNight) DarkMode.ForceLight else DarkMode.ForceDark, activities)
+    }
 }

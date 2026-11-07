@@ -12,9 +12,11 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.text.TextUtils
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.AbsListView
 import android.widget.BaseAdapter
@@ -102,12 +104,14 @@ class AppPickerDesign(
         bar.addView(c.text("‹", 30f, Ui.BLUE_DARK).apply {
             gravity = Gravity.CENTER
             setOnClickListener { requests.trySend(Request.Close) }
+            Tv.focusRing(this, 22f, oval = true, scale = 1.08f)
         }, LinearLayout.LayoutParams(c.dp(44), c.dp(44)))
         bar.addView(c.text(c.getString(R.string.zfy_pick_apps_title), 19f, Ui.TEXT, true),
             LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         bar.addView(c.text(c.getString(R.string.zfy_done), 16f, Ui.BLUE, true).apply {
-            setPadding(c.dp(12), c.dp(8), c.dp(8), c.dp(8))
+            setPadding(c.dp(12), c.dp(8), c.dp(12), c.dp(8))
             setOnClickListener { requests.trySend(Request.Close) }
+            Tv.focusRing(this, 10f, scale = 1.06f)
         })
         col.addView(bar)
 
@@ -120,6 +124,18 @@ class AppPickerDesign(
             setHintTextColor(Ui.TEXT_HINT)
             background = Ui.rounded(Ui.SURFACE, c.dp(22).toFloat(), Ui.BORDER, c.dp(1))
             setPadding(c.dp(16), 0, c.dp(16), 0)
+            imeOptions = EditorInfo.IME_ACTION_SEARCH or
+                (if (Tv.isTv(c)) EditorInfo.IME_FLAG_NO_EXTRACT_UI else 0)
+            Tv.focusRing(this, 22f, scale = 1f)
+            // 搜索 / Enter on the (TV) keyboard closes it and moves to the results.
+            setOnEditorActionListener { v, id, ev ->
+                val enter = ev != null && ev.action == KeyEvent.ACTION_DOWN && ev.keyCode == KeyEvent.KEYCODE_ENTER
+                if (id == EditorInfo.IME_ACTION_SEARCH || id == EditorInfo.IME_ACTION_DONE || enter) {
+                    hideKeyboard(v)
+                    if (rows.isNotEmpty()) list.requestFocus()
+                    true
+                } else false
+            }
             addTextChangedListener(object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, d: Int) = Unit
                 override fun onTextChanged(s: CharSequence?, a: Int, b: Int, d: Int) = Unit
@@ -147,6 +163,8 @@ class AppPickerDesign(
             setTextColor(Ui.TEXT_SUB)
             isChecked = showSystem
             tint()
+            setPadding(paddingLeft, c.dp(6), c.dp(8), c.dp(6))
+            Tv.focusRing(this, 10f, scale = 1f)
             setOnCheckedChangeListener { _, checked ->
                 this@AppPickerDesign.showSystem = checked
                 requests.trySend(Request.ToggleSystem)
@@ -164,7 +182,22 @@ class AppPickerDesign(
             isVerticalScrollBarEnabled = false
             setBackgroundColor(Color.TRANSPARENT)
             cacheColorHint = Color.TRANSPARENT
-            selector = android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)
+            // D-pad: ListView moves its selection between app rows (headers are disabled and skipped);
+            // the selector draws the focus ring over the selected row's card. Invisible in touch mode.
+            selector = android.graphics.drawable.InsetDrawable(
+                Tv.ringDrawable(c, c.dp(12).toFloat()), c.dp(12), c.dp(3), c.dp(4), c.dp(3),
+            )
+            setDrawSelectorOnTop(true)
+            itemsCanFocus = false
+            isFocusable = true
+            setOnItemClickListener { _, view, position, _ ->
+                val r = rows.getOrNull(position) as? Row.App ?: return@setOnItemClickListener
+                (view.tag as? AppHolder)?.box?.let { it.isChecked = !it.isChecked }
+                    ?: run {
+                        if (r.app.pkg in selected) selected.remove(r.app.pkg) else selected.add(r.app.pkg)
+                        updateCount()
+                    }
+            }
             adapter = this@AppPickerDesign.adapter
             setPadding(0, 0, c.dp(22), c.dp(16))
             clipToPadding = false
@@ -222,6 +255,11 @@ class AppPickerDesign(
         all = apps
         progress.visibility = View.GONE
         rebuild()
+        // Remote control: start in the list (the search field opens the keyboard on OK).
+        if (Tv.isTv(context) && rows.isNotEmpty()) list.post {
+            list.requestFocus()
+            list.setSelection(rows.indexOfFirst { it is Row.App }.coerceAtLeast(0))
+        }
     }
 
     private fun updateCount() {
@@ -327,7 +365,7 @@ class AppPickerDesign(
                         if (checked) selected.add(a.pkg) else selected.remove(a.pkg)
                         updateCount()
                     }
-                    v.setOnClickListener { h.box.isChecked = !h.box.isChecked }
+                    // Row taps / D-pad OK are handled by the ListView's item click listener.
                     loadIcon(a, h.icon)
                     v
                 }

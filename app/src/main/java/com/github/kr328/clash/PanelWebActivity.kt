@@ -23,6 +23,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.github.kr328.clash.zhifeiyun.AccountStore
 import com.github.kr328.clash.zhifeiyun.PanelConfig
+import com.github.kr328.clash.zhifeiyun.Tv
 import com.github.kr328.clash.zhifeiyun.Ui
 import com.github.kr328.clash.zhifeiyun.Ui.dp
 import com.github.kr328.clash.zhifeiyun.Ui.text
@@ -55,8 +56,9 @@ class PanelWebActivity : AppCompatActivity() {
             setPadding(dp(8), dp(4), dp(12), dp(4))
         }
         bar.addView(text("‹", 28f, Ui.BLUE).apply {
-            setPadding(dp(10), 0, dp(14), dp(4))
+            setPadding(dp(14), 0, dp(14), dp(4))
             setOnClickListener { onBackPressed() }
+            Tv.focusRing(this, 10f, scale = 1.08f)
         })
         titleView = text(intent.getStringExtra(EXTRA_TITLE) ?: getString(R.string.zfy_app_name), 16f, Ui.TEXT, true).apply {
             maxLines = 1
@@ -64,8 +66,9 @@ class PanelWebActivity : AppCompatActivity() {
         }
         bar.addView(titleView, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         bar.addView(text(getString(R.string.zfy_close), 15f, Ui.BLUE).apply {
-            setPadding(dp(12), dp(8), dp(4), dp(8))
+            setPadding(dp(12), dp(8), dp(12), dp(8))
             setOnClickListener { finish() }
+            Tv.focusRing(this, 10f, scale = 1.06f)
         })
         root.addView(bar, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(52)))
 
@@ -75,7 +78,11 @@ class PanelWebActivity : AppCompatActivity() {
         }
         root.addView(progress, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(3)))
 
-        web = WebView(this)
+        web = WebView(this).apply {
+            // Remote control: the page itself takes the D-pad (links / form fields); BACK goes back.
+            isFocusable = true
+            isFocusableInTouchMode = true
+        }
         root.addView(web, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
         setContentView(root)
 
@@ -111,9 +118,14 @@ class PanelWebActivity : AppCompatActivity() {
             override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
                 progress.visibility = View.VISIBLE
             }
+
+            override fun onPageFinished(view: WebView, url: String?) {
+                if (Tv.isTv(this@PanelWebActivity) && !view.hasFocus()) view.requestFocus()
+            }
         }
 
         web.loadUrl(intent.getStringExtra(EXTRA_URL) ?: PanelConfig.SHOP_URL)
+        if (Tv.isTv(this)) web.requestFocus()
     }
 
     /** true = handled outside the WebView. */

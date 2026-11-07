@@ -81,15 +81,17 @@ class NodePickerSheet(
             list.removeAllViews()
             delayViews.clear()
             var sel: View? = null
+            var first: View? = null
             NodeSort.apply(current, sort).forEach { p ->
                 val row = row(p, p.name == now) {
                     dialog.dismiss()
                     if (p.name != now) onSelect(p.name)
                 }
                 if (p.name == now) sel = row
+                if (first == null) first = row
                 list.addView(row)
             }
-            sel
+            sel ?: first
         }
         val selectedRow: View? = render()
         val scroll = NestedScrollView(c).apply {
@@ -120,7 +122,9 @@ class NodePickerSheet(
             background = Ui.rounded(Ui.SURFACE_ALT, c.dp(22).toFloat())
             setOnClickListener { dialog.dismiss() }
         }
+        Tv.focusRing(cancel, 22f)
         val test = c.primaryButton(c.getString(R.string.zfy_speed_test))
+        Tv.focusRing(test, 24f)
         test.setOnClickListener {
             test.isEnabled = false
             test.text = c.getString(R.string.zfy_testing)
@@ -154,11 +158,22 @@ class NodePickerSheet(
             val sheet = dialog.findViewById<FrameLayout>(com.google.android.material.R.id.design_bottom_sheet)
             if (sheet != null) {
                 sheet.setBackgroundColor(Color.TRANSPARENT)
+                // Wide screens (TV / tablet / landscape): keep the sheet ~600dp wide and centred.
+                val maxW = c.dp(Tv.MAX_CONTENT_DP)
+                if (c.resources.displayMetrics.widthPixels > maxW) {
+                    sheet.layoutParams = sheet.layoutParams.apply { width = maxW }
+                }
                 val behavior = BottomSheetBehavior.from(sheet)
                 behavior.skipCollapsed = true
                 behavior.state = BottomSheetBehavior.STATE_EXPANDED
             }
-            selectedRow?.let { r -> scroll.post { scroll.scrollTo(0, (r.top - c.dp(96)).coerceAtLeast(0)) } }
+            selectedRow?.let { r ->
+                scroll.post {
+                    scroll.scrollTo(0, (r.top - c.dp(96)).coerceAtLeast(0))
+                    // D-pad: start on the current node; NestedScrollView keeps the focused row in view.
+                    if (Tv.isTv(c) || !r.isInTouchMode) r.requestFocus()
+                }
+            }
         }
         dialog.show()
     }
@@ -170,6 +185,7 @@ class NodePickerSheet(
                 val on = m == mode
                 v.setTextColor(if (on) Color.WHITE else Ui.TEXT_SUB)
                 v.background = if (on) Ui.rounded(Ui.BLUE, v.resources.displayMetrics.density * 12) else null
+                Tv.refreshRing(v, 12f)
             }
         }
     }
@@ -189,6 +205,8 @@ class NodePickerSheet(
         val n = seg(c.getString(R.string.zfy_sort_name))
         box.addView(d); box.addView(n)
         val t = SortToggle(box, d, n)
+        Tv.focusRing(d, 12f, scale = 1.06f)
+        Tv.focusRing(n, 12f, scale = 1.06f)
         d.setOnClickListener { t.onChange(NodeSort.Mode.Delay) }
         n.setOnClickListener { t.onChange(NodeSort.Mode.Name) }
         t.bind(sort)
@@ -208,6 +226,7 @@ class NodePickerSheet(
             isClickable = true
             setOnClickListener { onClick() }
         }
+        Tv.focusRing(row, 10f, scale = 1f)
         row.addView(View(c).apply { background = radio(selected) },
             LinearLayout.LayoutParams(c.dp(18), c.dp(18)))
         val name = c.text(p.title.ifBlank { p.name }, 15f, if (selected) Ui.BLUE_DARK else Ui.TEXT, selected).apply {

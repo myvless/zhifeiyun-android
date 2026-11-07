@@ -21,6 +21,7 @@ import com.github.kr328.clash.util.startClashService
 import com.github.kr328.clash.util.stopClashService
 import com.github.kr328.clash.util.withClash
 import com.github.kr328.clash.util.withProfile
+import com.github.kr328.clash.zhifeiyun.Tv
 import com.github.kr328.clash.core.bridge.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
@@ -34,6 +35,7 @@ class AdvancedActivity : BaseActivity<MainDesign>() {
         val design = MainDesign(this)
 
         setContentDesign(design)
+        tvTweaks(design.root)
 
         design.fetch()
 
@@ -86,6 +88,31 @@ class AdvancedActivity : BaseActivity<MainDesign>() {
                 }
             }
         }
+    }
+
+    /**
+     * Remote control / wide screens for the 高级 page (CMFA layout): stronger focus ring on the
+     * cards on TV, and content limited to ~600dp and centred when the screen is wider.
+     */
+    private fun tvTweaks(root: android.view.View) {
+        val tv = Tv.isTv(this)
+        val maxW = (Tv.MAX_CONTENT_DP * resources.displayMetrics.density).toInt()
+        fun walk(v: android.view.View) {
+            if (v is com.google.android.material.card.MaterialCardView) {
+                if (tv) Tv.focusRing(v, v.radius / resources.displayMetrics.density, scale = 1.02f)
+            }
+            if (v is android.widget.ScrollView && v.childCount == 1 &&
+                resources.displayMetrics.widthPixels > maxW
+            ) {
+                val child = v.getChildAt(0)
+                child.layoutParams = android.widget.FrameLayout.LayoutParams(
+                    maxW, android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                    android.view.Gravity.CENTER_HORIZONTAL,
+                )
+            }
+            if (v is android.view.ViewGroup) for (i in 0 until v.childCount) walk(v.getChildAt(i))
+        }
+        walk(root)
     }
 
     private suspend fun MainDesign.fetch() {

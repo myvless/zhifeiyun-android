@@ -23,7 +23,7 @@ import kotlinx.coroutines.withContext
 
 /** Beginner-friendly home screen, built in code (no data binding). */
 class SimpleMainDesign(context: Context) : Design<SimpleMainDesign.Request>(context) {
-    enum class Request { Toggle, OpenNodes, Renew, Advanced, Logout, Refresh, ModeRule, ModeGlobal, TogglePerApp, PickApps, ToggleTheme, FollowSystemTheme }
+    enum class Request { Toggle, OpenNodes, Renew, Advanced, Logout, Refresh, ModeRule, ModeGlobal, TogglePerApp, PickApps, ToggleTheme, FollowSystemTheme, CycleTheme }
 
     enum class State { Disconnected, Connecting, Connected }
 
@@ -49,7 +49,9 @@ class SimpleMainDesign(context: Context) : Design<SimpleMainDesign.Request>(cont
 
     init {
         val c = context
-        val col = LinearLayout(c).apply {
+        val tv = Tv.isTv(c)
+        // Content is limited to ~600dp and centred on wide screens (TV, tablets, landscape).
+        val col = Tv.maxWidthColumn(c).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(c.dp(20), c.dp(12), c.dp(20), c.dp(24))
         }
@@ -65,21 +67,29 @@ class SimpleMainDesign(context: Context) : Design<SimpleMainDesign.Request>(cont
         header.addView(c.text(c.getString(R.string.zfy_app_name), 22f, Ui.BLUE_DARK, true),
             LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { leftMargin = c.dp(6) })
         // Light/dark toggle: shows the moon in light mode (tap → dark) and the sun in dark mode.
-        header.addView(ImageView(c).apply {
+        val themeToggle = ImageView(c).apply {
             setImageResource(if (Ui.night) R.drawable.ic_zfy_sun else R.drawable.ic_zfy_moon)
             imageTintList = ColorStateList.valueOf(if (Ui.night) 0xFFFFC94D.toInt() else Ui.BLUE_DARK)
             background = Ui.rounded(Ui.SURFACE, c.dp(18).toFloat(), Ui.BORDER, c.dp(1))
             setPadding(c.dp(8), c.dp(8), c.dp(8), c.dp(8))
             contentDescription = c.getString(
-                if (Ui.night) R.string.zfy_theme_to_light else R.string.zfy_theme_to_dark
+                if (tv) R.string.zfy_theme_cycle_tv
+                else if (Ui.night) R.string.zfy_theme_to_light else R.string.zfy_theme_to_dark
             )
-            setOnClickListener { requests.trySend(Request.ToggleTheme) }
+            // Phone: tap flips 浅色/深色, long-press = 跟随系统. TV remote: OK cycles
+            // 浅色 → 深色 → 跟随系统 (long-press of OK still works too).
+            setOnClickListener { requests.trySend(if (tv) Request.CycleTheme else Request.ToggleTheme) }
             setOnLongClickListener { requests.trySend(Request.FollowSystemTheme); true }
-        }, LinearLayout.LayoutParams(c.dp(36), c.dp(36)).apply { leftMargin = c.dp(8) })
-        header.addView(c.text(c.getString(R.string.zfy_advanced), 15f, Ui.BLUE).apply {
-            setPadding(c.dp(12), c.dp(8), c.dp(4), c.dp(8))
+        }
+        Tv.focusRing(themeToggle, oval = true, scale = 1.12f)
+        header.addView(themeToggle, LinearLayout.LayoutParams(c.dp(36), c.dp(36)).apply { leftMargin = c.dp(8) })
+        val advanced = c.text(c.getString(R.string.zfy_advanced), 15f, Ui.BLUE).apply {
+            setPadding(c.dp(12), c.dp(8), c.dp(12), c.dp(8))
             setOnClickListener { requests.trySend(Request.Advanced) }
-        })
+        }
+        Tv.focusRing(advanced, 10f, scale = 1.06f)
+        header.addView(advanced, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT).apply { leftMargin = c.dp(4); rightMargin = -c.dp(8) })
         col.addView(header)
 
         // Big connect button
@@ -87,6 +97,7 @@ class SimpleMainDesign(context: Context) : Design<SimpleMainDesign.Request>(cont
             gravity = Gravity.CENTER
             setOnClickListener { requests.trySend(Request.Toggle) }
         }
+        Tv.focusRing(connectButton, oval = true, scale = 1.06f)
         connectRing = LinearLayout(c).apply {
             gravity = Gravity.CENTER
             setPadding(c.dp(10), c.dp(10), c.dp(10), c.dp(10))
@@ -117,6 +128,7 @@ class SimpleMainDesign(context: Context) : Design<SimpleMainDesign.Request>(cont
                 gravity = Gravity.CENTER
                 setOnClickListener { requests.trySend(req) }
             }
+            Tv.focusRing(tab, 19f, scale = 1.04f)
             modeTabs.add(tab)
             seg.addView(tab, LinearLayout.LayoutParams(0, c.dp(38), 1f))
         }
@@ -131,14 +143,16 @@ class SimpleMainDesign(context: Context) : Design<SimpleMainDesign.Request>(cont
         // Per-app card: 仅代理所选应用 switch + 加速APP row with icons
         val appsCard = card(c).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(c.dp(18), c.dp(6), c.dp(14), c.dp(6))
+            // Rows carry 8dp side padding themselves so the D-pad focus ring has room.
+            setPadding(c.dp(10), c.dp(6), c.dp(6), c.dp(6))
         }
         val switchRow = LinearLayout(c).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, c.dp(8), 0, c.dp(8))
+            setPadding(c.dp(8), c.dp(8), c.dp(8), c.dp(8))
             setOnClickListener { perAppSwitch.toggle() }
         }
+        Tv.focusRing(switchRow, 10f, scale = 1f)
         val switchText = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL }
         switchText.addView(c.text(c.getString(R.string.zfy_per_app_title), 15f, Ui.TEXT, true))
         switchText.addView(c.text(c.getString(R.string.zfy_per_app_hint), 12f, Ui.TEXT_SUB).apply {
@@ -157,19 +171,24 @@ class SimpleMainDesign(context: Context) : Design<SimpleMainDesign.Request>(cont
             setOnCheckedChangeListener { _, _ ->
                 if (!bindingSwitch) requests.trySend(Request.TogglePerApp)
             }
+            // The whole row is the D-pad target; the switch itself is not a separate stop.
+            isFocusable = false
         }
         switchRow.addView(perAppSwitch)
         appsCard.addView(switchRow)
 
         appsDivider = View(c).apply { setBackgroundColor(Ui.DIVIDER) }
-        appsCard.addView(appsDivider, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1))
+        appsCard.addView(appsDivider, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1).apply {
+            leftMargin = c.dp(8); rightMargin = c.dp(8)
+        })
 
         appsEntry = LinearLayout(c).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, c.dp(12), 0, c.dp(12))
+            setPadding(c.dp(8), c.dp(12), c.dp(8), c.dp(12))
             setOnClickListener { requests.trySend(Request.PickApps) }
         }
+        Tv.focusRing(appsEntry, 10f, scale = 1f)
         appsEntry.addView(c.text(c.getString(R.string.zfy_accel_apps), 15f, Ui.TEXT, true))
         appIcons = AppIconStrip(c)
         appsEntry.addView(appIcons, LinearLayout.LayoutParams(0, c.dp(28), 1f).apply {
@@ -185,6 +204,7 @@ class SimpleMainDesign(context: Context) : Design<SimpleMainDesign.Request>(cont
             gravity = Gravity.CENTER_VERTICAL
             setOnClickListener { requests.trySend(Request.OpenNodes) }
         }
+        Tv.focusRing(nodeCard, 16f, scale = 1.02f)
         val nodeCol = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL }
         nodeCol.addView(c.text(c.getString(R.string.zfy_current_node), 13f, Ui.TEXT_SUB))
         nodeText = c.text(c.getString(R.string.zfy_node_auto), 17f, Ui.TEXT, true).apply {
@@ -216,9 +236,11 @@ class SimpleMainDesign(context: Context) : Design<SimpleMainDesign.Request>(cont
         val btnRow = LinearLayout(c).apply { orientation = LinearLayout.HORIZONTAL }
         btnRow.addView(c.primaryButton(c.getString(R.string.zfy_renew)).apply {
             setOnClickListener { requests.trySend(Request.Renew) }
+            Tv.focusRing(this, 24f)
         }, LinearLayout.LayoutParams(0, c.dp(46), 1f).apply { rightMargin = c.dp(6) })
         btnRow.addView(c.outlineButton(c.getString(R.string.zfy_refresh)).apply {
             setOnClickListener { requests.trySend(Request.Refresh) }
+            Tv.focusRing(this, 24f)
         }, LinearLayout.LayoutParams(0, c.dp(46), 1f).apply { leftMargin = c.dp(6) })
         acct.addView(btnRow, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = c.dp(14) })
@@ -227,19 +249,31 @@ class SimpleMainDesign(context: Context) : Design<SimpleMainDesign.Request>(cont
         // Logout
         col.addView(c.text(c.getString(R.string.zfy_logout), 14f, Ui.TEXT_SUB).apply {
             gravity = Gravity.CENTER
-            setPadding(0, c.dp(20), 0, c.dp(8))
+            setPadding(c.dp(16), c.dp(10), c.dp(16), c.dp(10))
             setOnClickListener { requests.trySend(Request.Logout) }
-        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+            Tv.focusRing(this, 10f)
+        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            topMargin = c.dp(10)
+        })
 
         root = ScrollView(c).apply {
             setBackgroundColor(Ui.GREY_BG)
             isFillViewport = true
             fitsSystemWindows = true
-            addView(col)
+            addView(col, Tv.centeredInFrame())
         }
 
         applyState(State.Disconnected)
         applyMode(ProxyMode.Rule, false, emptyList())
+
+        // D-pad: start on the big connect button (or back on the theme toggle after a theme change).
+        if (ThemeMode.refocusToggle) {
+            ThemeMode.refocusToggle = false
+            Tv.initialFocus(themeToggle)
+        } else {
+            Tv.initialFocus(connectButton)
+        }
     }
 
     private fun applyMode(mode: ProxyMode, perApp: Boolean, icons: List<Drawable>) {
@@ -248,6 +282,7 @@ class SimpleMainDesign(context: Context) : Design<SimpleMainDesign.Request>(cont
             val on = i == mode.ordinal
             tab.background = if (on) Ui.rounded(Ui.BLUE, c.dp(19).toFloat()) else null
             tab.setTextColor(if (on) Color.WHITE else Ui.TEXT_SUB)
+            Tv.refreshRing(tab, 19f)
         }
         modeHint.text = c.getString(when (mode) {
             ProxyMode.Rule -> if (perApp) R.string.zfy_mode_rule_hint_apps else R.string.zfy_mode_rule_hint
@@ -285,6 +320,7 @@ class SimpleMainDesign(context: Context) : Design<SimpleMainDesign.Request>(cont
             shape = GradientDrawable.OVAL
             setColor(color)
         }
+        Tv.refreshRing(connectButton, oval = true)
         connectRing.background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
             setColor((color and 0x00FFFFFF) or Ui.RING_ALPHA)

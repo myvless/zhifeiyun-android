@@ -107,4 +107,7 @@
     <string name="zfy_theme_to_dark">切换到深色模式（长按：跟随系统）</string>
     <string name="zfy_theme_to_light">切换到浅色模式（长按：跟随系统）</string>
     <string name="zfy_theme_follow_system">已设为跟随系统深浅色</string>
+    <string name="zfy_theme_now_light">已切换为浅色模式</string>
+    <string name="zfy_theme_now_dark">已切换为深色模式</string>
+    <string name="zfy_theme_cycle_tv">切换深浅色（浅色 → 深色 → 跟随系统）</string>
 </resources>

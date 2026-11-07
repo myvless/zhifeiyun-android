@@ -57,9 +57,14 @@ class AppPickerActivity : BaseActivity<AppPickerDesign>() {
     private fun loadApps(): List<PickApp> {
         val pm = packageManager
         val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-        val launchable = runCatching {
-            pm.queryIntentActivities(launcher, 0).map { it.activityInfo.packageName }.toHashSet()
-        }.getOrDefault(hashSetOf())
+        // TV apps only declare LEANBACK_LAUNCHER, so count those as normal (user) apps too.
+        val tvLauncher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER)
+        val launchable = hashSetOf<String>()
+        listOf(launcher, tvLauncher).forEach { i ->
+            runCatching {
+                pm.queryIntentActivities(i, 0).forEach { launchable.add(it.activityInfo.packageName) }
+            }
+        }
 
         @Suppress("DEPRECATION")
         val installed = runCatching { pm.getInstalledApplications(0) }

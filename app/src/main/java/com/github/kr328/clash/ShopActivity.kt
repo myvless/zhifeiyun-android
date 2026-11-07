@@ -6,7 +6,10 @@ import android.net.Uri
 import android.os.Bundle
 import android.text.InputType
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.View
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -23,6 +26,7 @@ import com.github.kr328.clash.zhifeiyun.PanelConfig
 import com.github.kr328.clash.zhifeiyun.ShopClient
 import com.github.kr328.clash.zhifeiyun.ShopParser
 import com.github.kr328.clash.zhifeiyun.ShopParser.PayKind
+import com.github.kr328.clash.zhifeiyun.Tv
 import com.github.kr328.clash.zhifeiyun.Ui
 import com.github.kr328.clash.zhifeiyun.Ui.dp
 import com.github.kr328.clash.zhifeiyun.Ui.outlineButton
@@ -50,6 +54,7 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
     private lateinit var body: LinearLayout
     private lateinit var scroll: ScrollView
     private lateinit var footer: LinearLayout
+    private lateinit var footerBox: android.widget.FrameLayout
 
     private var step = Step.Products
     private var products: List<ShopParser.Product>? = null
@@ -102,35 +107,41 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
             setPadding(dp(8), dp(4), dp(12), dp(4))
         }
         bar.addView(text("‹", 28f, Ui.BLUE).apply {
-            setPadding(dp(10), 0, dp(14), dp(4))
+            setPadding(dp(14), 0, dp(14), dp(4))
             setOnClickListener { onBackPressed() }
+            Tv.focusRing(this, 10f, scale = 1.08f)
         })
         titleView = text(getString(R.string.zfy_shop_title), 17f, Ui.TEXT, true)
         bar.addView(titleView, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         bar.addView(text(getString(R.string.zfy_open_web), 14f, Ui.BLUE).apply {
-            setPadding(dp(12), dp(8), dp(4), dp(8))
+            setPadding(dp(12), dp(8), dp(12), dp(8))
             setOnClickListener { openWeb(currentWebUrl(), null) }
+            Tv.focusRing(this, 10f, scale = 1.06f)
         })
         root.addView(bar, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(52)))
 
-        body = LinearLayout(this).apply {
+        // Content limited to ~600dp and centred on wide screens (TV / tablet / landscape).
+        body = Tv.maxWidthColumn(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(12), dp(16), dp(24))
         }
         scroll = ScrollView(this).apply {
             isFillViewport = true
-            addView(body)
+            addView(body, Tv.centeredInFrame())
         }
         root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
 
-        footer = LinearLayout(this).apply {
+        footer = Tv.maxWidthColumn(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Ui.SURFACE)
             setPadding(dp(16), dp(10), dp(16), dp(12))
+        }
+        footerBox = android.widget.FrameLayout(this).apply {
+            setBackgroundColor(Ui.SURFACE)
             elevation = dp(4).toFloat()
             visibility = View.GONE
+            addView(footer, Tv.centeredInFrame())
         }
-        root.addView(footer, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        root.addView(footerBox, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         return root
     }
 
@@ -142,7 +153,7 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
 
     private fun showLoading(msg: String) {
         body.removeAllViews()
-        footer.visibility = View.GONE
+        footerBox.visibility = View.GONE
         val box = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
@@ -155,16 +166,20 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
 
     private fun showError(msg: String, retry: () -> Unit) {
         body.removeAllViews()
-        footer.visibility = View.GONE
+        footerBox.visibility = View.GONE
         val c = card()
         c.addView(text(msg, 15f, Ui.TEXT).apply { gravity = Gravity.CENTER })
         val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         row.addView(outlineButton(getString(R.string.zfy_open_web)).apply {
             setOnClickListener { openWeb(currentWebUrl(), step) }
+            Tv.focusRing(this, 24f)
         }, LinearLayout.LayoutParams(0, dp(44), 1f).apply { rightMargin = dp(6) })
-        row.addView(primaryButton(getString(R.string.zfy_retry)).apply {
+        val retryBtn = primaryButton(getString(R.string.zfy_retry)).apply {
             setOnClickListener { retry() }
-        }, LinearLayout.LayoutParams(0, dp(44), 1f).apply { leftMargin = dp(6) })
+            Tv.focusRing(this, 24f)
+        }
+        row.addView(retryBtn, LinearLayout.LayoutParams(0, dp(44), 1f).apply { leftMargin = dp(6) })
+        Tv.initialFocus(retryBtn)
         c.addView(row, matchWrap().apply { topMargin = dp(16) })
         body.addView(c, matchWrap().apply { topMargin = dp(40) })
     }
@@ -227,12 +242,14 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
 
     private fun renderProducts(list: List<ShopParser.Product>) {
         body.removeAllViews()
-        footer.visibility = View.GONE
+        footerBox.visibility = View.GONE
         if (list.isEmpty()) {
             val c = card()
             c.addView(text(getString(R.string.zfy_no_plans), 15f, Ui.TEXT).apply { gravity = Gravity.CENTER })
             c.addView(outlineButton(getString(R.string.zfy_open_web)).apply {
                 setOnClickListener { openWeb(PanelConfig.SHOP_URL, Step.Products) }
+                Tv.focusRing(this, 24f)
+                Tv.initialFocus(this)
             }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(44)).apply { topMargin = dp(16) })
             body.addView(c, matchWrap().apply { topMargin = dp(24) })
             return
@@ -241,6 +258,7 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
             setPadding(dp(4), dp(4), 0, dp(4))
         })
         var lastCat: String? = "\u0000"
+        firstFocus = null
         ShopParser.groupProducts(list).forEach { g ->
             if (g.category != lastCat) {
                 lastCat = g.category
@@ -252,7 +270,12 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
             }
             body.addView(planCard(g), matchWrap().apply { topMargin = dp(10) })
         }
+        // D-pad: start on the first plan (its selected duration chip, or its 购买 button).
+        firstFocus?.let { Tv.initialFocus(it) }
     }
+
+    /** First D-pad target of the plan list, set while rendering. */
+    private var firstFocus: View? = null
 
     /** Selected period per plan card, kept while the activity lives (e.g. back from 确认订单). */
     private val selectedOption = HashMap<String, String>()
@@ -307,6 +330,7 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
         }
 
         val buy = primaryButton(getString(R.string.zfy_buy))
+        Tv.focusRing(buy, 24f)
         val chips = ArrayList<Pair<ShopParser.Product, TextView>>()
 
         fun refresh() {
@@ -340,6 +364,8 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
                         refresh()
                     }
                 }
+                // Focusable for the D-pad; a horizontally scrolling row keeps the focused chip in view.
+                Tv.focusRing(chip, 10f, scale = 1.06f)
                 val lp = if (weighted) LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
                 else LinearLayout.LayoutParams(dp(72), ViewGroup.LayoutParams.WRAP_CONTENT)
                 if (i > 0) lp.leftMargin = dp(5)
@@ -351,7 +377,9 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
                 addView(row)
             }
             c.addView(holder, matchWrap().apply { topMargin = dp(12) })
+            if (firstFocus == null) firstFocus = chips.firstOrNull { it.first.id == selected.id }?.second
         }
+        if (firstFocus == null && g.available) firstFocus = buy
 
         buy.setOnClickListener {
             if (!selected.available) return@setOnClickListener
@@ -387,6 +415,7 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
                 v.background = Ui.rounded(Ui.SURFACE_ALT, dp(10).toFloat(), Ui.BORDER, dp(1))
             }
         }
+        Tv.refreshRing(v, 10f)
     }
 
     // ------------------------------------------------------------------ step 2: confirm + coupon
@@ -429,9 +458,20 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
             setPadding(dp(14), 0, dp(14), 0)
             background = Ui.rounded(Ui.SURFACE_ALT, dp(10).toFloat())
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            imeOptions = EditorInfo.IME_ACTION_DONE
+            Tv.focusRing(this, 10f, scale = 1f)
         }
         val couponStatus = text("", 13f, Ui.TEXT_SUB).apply { visibility = View.GONE; setPadding(0, dp(6), 0, 0) }
         val applyBtn = outlineButton(getString(R.string.zfy_apply))
+        Tv.focusRing(applyBtn, 24f)
+        // 完成 / Enter on the keyboard applies the coupon.
+        couponInput.setOnEditorActionListener { v, id, ev ->
+            val enter = ev != null && ev.action == KeyEvent.ACTION_DOWN && ev.keyCode == KeyEvent.KEYCODE_ENTER
+            if (id == EditorInfo.IME_ACTION_DONE || enter) {
+                (getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager)?.hideSoftInputFromWindow(v.windowToken, 0)
+                applyBtn.performClick(); true
+            } else false
+        }
         couponRow.addView(couponInput, LinearLayout.LayoutParams(0, dp(44), 1f))
         couponRow.addView(applyBtn, LinearLayout.LayoutParams(dp(76), dp(44)).apply { leftMargin = dp(8) })
         couponCard.addView(couponRow, matchWrap().apply { topMargin = dp(8) })
@@ -473,8 +513,9 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
 
         // Footer
         footer.removeAllViews()
-        footer.visibility = View.VISIBLE
+        footerBox.visibility = View.VISIBLE
         val create = primaryButton(getString(R.string.zfy_create_order))
+        Tv.focusRing(create, 24f)
         create.setOnClickListener {
             create.isEnabled = false
             create.text = getString(R.string.zfy_processing)
@@ -494,6 +535,7 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
         }
         footer.addView(create, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)))
         scroll.scrollTo(0, 0)
+        Tv.initialFocus(create)
     }
 
     // ------------------------------------------------------------------ step 3: invoice + payment
@@ -541,7 +583,7 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
         }
 
         footer.removeAllViews()
-        footer.visibility = View.VISIBLE
+        footerBox.visibility = View.VISIBLE
 
         if (!inv.unpaid) {
             val done = card()
@@ -549,6 +591,8 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
             body.addView(done, matchWrap().apply { topMargin = dp(12) })
             footer.addView(primaryButton(getString(R.string.zfy_done)).apply {
                 setOnClickListener { setResult(RESULT_OK); finish() }
+                Tv.focusRing(this, 24f)
+                Tv.initialFocus(this)
             }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)))
             return
         }
@@ -574,6 +618,7 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
                     gravity = Gravity.CENTER_VERTICAL
                     setPadding(dp(18), dp(14), dp(18), dp(14))
                 }
+                Tv.focusRing(row, 10f, scale = 1f)
                 val dot = View(this)
                 row.addView(dot, LinearLayout.LayoutParams(dp(18), dp(18)))
                 val label = if (o.kind == PayKind.Balance && inv.balance != null)
@@ -594,14 +639,17 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
 
         val pay = primaryButton(getString(R.string.zfy_go_pay, shop.money(inv.price) ?: ""))
         pay.isEnabled = inv.options.isNotEmpty()
+        Tv.focusRing(pay, 24f)
         pay.setOnClickListener { option?.let { startPay(inv, it, pay) } }
         footer.addView(pay, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)))
         footer.addView(text(getString(R.string.zfy_paid_refresh), 14f, Ui.BLUE).apply {
             gravity = Gravity.CENTER
             setPadding(0, dp(12), 0, dp(4))
             setOnClickListener { loadInvoice(inv.id, quiet = true) }
+            Tv.focusRing(this, 10f, scale = 1f)
         }, matchWrap())
         scroll.scrollTo(0, 0)
+        Tv.initialFocus(pay)
     }
 
     private fun startPay(inv: ShopParser.Invoice, o: ShopParser.PayOption, btn: TextView) {
@@ -709,6 +757,7 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
                 setSingleLine(true)
                 inputType = if (password) InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
                 else InputType.TYPE_CLASS_NUMBER
+                imeOptions = EditorInfo.IME_ACTION_DONE
             }
             val box = LinearLayout(this).apply {
                 setPadding(dp(24), dp(8), dp(24), 0)
@@ -722,7 +771,13 @@ class ShopActivity : AppCompatActivity(), CoroutineScope by MainScope() {
             }
                 .setNegativeButton(android.R.string.cancel) { _, _ -> if (!done) { done = true; cont.resume(null) } }
                 .setOnCancelListener { if (!done) { done = true; cont.resume(null) } }
-                .show()
+            val dlg = b.show()
+            input.setOnEditorActionListener { _, id, ev ->
+                val enter = ev != null && ev.action == KeyEvent.ACTION_DOWN && ev.keyCode == KeyEvent.KEYCODE_ENTER
+                if (id == EditorInfo.IME_ACTION_DONE || enter) {
+                    dlg.getButton(AlertDialog.BUTTON_POSITIVE)?.performClick(); true
+                } else false
+            }
         }
 
     // ------------------------------------------------------------------ helpers

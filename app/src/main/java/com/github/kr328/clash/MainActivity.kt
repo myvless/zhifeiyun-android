@@ -92,7 +92,18 @@ class MainActivity : BaseActivity<SimpleMainDesign>() {
                             ThemeMode.toggle(ApplicationObserver.createdActivities)
                         SimpleMainDesign.Request.FollowSystemTheme -> {
                             Toast.makeText(applicationContext, R.string.zfy_theme_follow_system, Toast.LENGTH_SHORT).show()
-                            ThemeMode.set(DarkMode.Auto, ApplicationObserver.createdActivities)
+                            if (ThemeMode.mode != DarkMode.Auto) {
+                                ThemeMode.refocusToggle = true
+                                ThemeMode.set(DarkMode.Auto, ApplicationObserver.createdActivities)
+                            }
+                        }
+                        SimpleMainDesign.Request.CycleTheme -> {
+                            val m = ThemeMode.cycle(ApplicationObserver.createdActivities)
+                            Toast.makeText(applicationContext, when (m) {
+                                DarkMode.ForceLight -> R.string.zfy_theme_now_light
+                                DarkMode.ForceDark -> R.string.zfy_theme_now_dark
+                                DarkMode.Auto -> R.string.zfy_theme_follow_system
+                            }, Toast.LENGTH_SHORT).show()
                         }
                     }
                 }
